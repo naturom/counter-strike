@@ -1,3 +1,4 @@
+import {DEFAULT_MAP,validMap} from '@sirocco/shared';
 import {createServer, type IncomingMessage, type ServerResponse} from 'node:http';
 import {randomBytes} from 'node:crypto';
 import {Server,matchMaker} from '@colyseus/core';
@@ -21,7 +22,7 @@ export async function createGameServer(options:{secret?:string;handler?:(req:Inc
   const http=createServer(async(req,res)=>{
     const path=(req.url??'/').split('?')[0];
     res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('X-Frame-Options','DENY');
-    if(path==='/health'){json(res,stopping?503:200,{ok:!stopping,service:'desert-fps',rooms:activeRooms.size,version:'1.0.0'});return;}
+    if(path==='/health'){json(res,stopping?503:200,{ok:!stopping,service:'desert-fps',rooms:activeRooms.size,version:'2.0.0'});return;}
     if(path.startsWith('/api/')||path.startsWith('/matchmake/')) {
       // Behind Cloud Run the last X-Forwarded-For hop is set by its trusted proxy.
       const forwarded=String(req.headers['x-forwarded-for']??'').split(',').map(s=>s.trim());
@@ -37,7 +38,8 @@ export async function createGameServer(options:{secret?:string;handler?:(req:Inc
         let raw='';for await(const chunk of req){raw+=chunk;if(raw.length>2048){json(res,413,{error:'Request too large'});return;}}
         const body=JSON.parse(raw||'{}');
         if(typeof body.nickname!=='string'||!body.nickname.trim()||body.nickname.length>20){json(res,400,{error:'Enter a nickname (1–20 characters).'});return;}
-        const invite=body.invite??signs.create();const payload=signs.verify(invite);
+        if(body.mapId!==undefined&&!validMap(body.mapId))throw new Error('Unknown map');
+        const invite=body.invite??signs.create(Date.now(),body.mapId??DEFAULT_MAP);const payload=signs.verify(invite);
         const result=await serial(payload.id,async()=>{
           let id=roomsByInvite.get(payload.id);let room=id?await matchMaker.query({roomId:id}):[];
           const fresh=!room.length;
@@ -48,7 +50,7 @@ export async function createGameServer(options:{secret?:string;handler?:(req:Inc
           const local=activeRooms.get(id!);
           if(local && local.sim.players.size>=8 || room[0].locked)throw Object.assign(new Error('Room full: all 8 seats are occupied or reconnecting.'),{status:409});
           const reservation=await matchMaker.reserveSeatFor(room[0],{invite,nickname:body.nickname});
-          return {invite,reservation,fresh,matchId:local?.sim.matchId};
+          return {invite,reservation,fresh,mapId:payload.mapId,matchId:local?.sim.matchId};
         });
         json(res,200,result);
       }catch(error){const e=error as Error & {status?:number};json(res,e.status??400,{error:e.message||'Unable to join room'});}

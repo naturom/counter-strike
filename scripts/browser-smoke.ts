@@ -8,21 +8,28 @@ async function main(){
   const errors:string[]=[];
   try{
     const c1=await browser.newContext({viewport:{width:1440,height:1000}}),c2=await browser.newContext({viewport:{width:1440,height:1000}});
-    const a=await c1.newPage(),b=await c2.newPage();for(const p of [a,b])p.on('pageerror',e=>errors.push(e.message));
-    await a.goto(base);await a.getByRole('button',{name:'CREATE A ROOM'}).waitFor({state:'visible'});await a.waitForTimeout(2000);await a.screenshot({path:'artifacts/lobby.png'});
+    await c1.addInitScript(()=>{const native=window.AudioContext;const evidence={context:null as AudioContext|null,sources:0,hits:0};(window as any).__audioEvidence=evidence;window.AudioContext=class extends native{constructor(options?:AudioContextOptions){super(options);evidence.context=this;}createBufferSource(){const source=super.createBufferSource(),start=source.start.bind(source);source.start=(...args:Parameters<AudioBufferSourceNode['start']>)=>{evidence.sources++;start(...args);};return source;}};new MutationObserver(()=>{if(document.querySelector('.damage-vignette.impact'))evidence.hits++;}).observe(document,{subtree:true,attributes:true,childList:true});});
+    const a=await c1.newPage(),b=await c2.newPage();const waitText=async(selector:string,text:string)=>a.waitForFunction(({selector,text})=>document.querySelector(selector)?.textContent?.includes(text),{selector,text},{timeout:10000});for(const p of [a,b])p.on('pageerror',e=>errors.push(e.message));
+    await a.goto(base);await a.getByRole('button',{name:'CREATE A ROOM'}).waitFor({state:'visible'});await a.waitForTimeout(2000);await a.getByRole('button',{name:'Relay The original outpost'}).click();await a.waitForTimeout(300);assert.equal(await a.getByRole('button',{name:'Relay The original outpost'}).getAttribute('aria-pressed'),'true');await a.getByRole('button',{name:'Dunes Dust II inspired'}).click();await a.waitForTimeout(300);await a.screenshot({path:'artifacts/lobby.png'});
     await a.getByLabel('YOUR CALLSIGN').fill('Browser-Red');await a.getByRole('button',{name:'CREATE A ROOM'}).click();await a.getByRole('button',{name:'EXPLORE THE ARENA'}).waitFor({timeout:60000});
-    await b.goto(a.url());await b.getByLabel('YOUR CALLSIGN').fill('Browser-Blue');await b.getByRole('button',{name:'JOIN THE ROOM'}).click();await b.getByRole('button',{name:'ENTER THE ARENA'}).waitFor({timeout:60000});
+    const navigation=await b.goto(a.url());assert.equal(navigation?.status(),200,'second browser loaded the homepage');await b.getByLabel('YOUR CALLSIGN').waitFor({timeout:90000}).catch(async error=>{console.error(JSON.stringify({url:b.url(),body:(await b.locator('body').innerText()).slice(0,2000),errors}));await b.screenshot({path:'artifacts/browser-failure.png'});throw error;});await b.getByLabel('YOUR CALLSIGN').fill('Browser-Blue');await b.getByRole('button',{name:'JOIN THE ROOM'}).click();await b.getByRole('button',{name:'ENTER THE ARENA'}).waitFor({timeout:60000});
     await a.getByRole('button',{name:'ENTER THE ARENA'}).click();await a.waitForTimeout(300);assert.equal(await a.evaluate(()=>document.pointerLockElement?.tagName),'CANVAS');
-    await a.keyboard.down('KeyW');await a.waitForTimeout(650);await a.keyboard.up('KeyW');await a.mouse.down();await a.waitForTimeout(320);await a.mouse.up();await a.waitForTimeout(150);
-    const ammo=await a.locator('.ammo strong').innerText();assert.ok(Number(ammo)<30,'browser fire reduced authoritative ammunition');
-    await a.keyboard.press('KeyR');await a.waitForTimeout(2200);assert.equal(await a.locator('.ammo strong').innerText(),'30');
-    await a.keyboard.press('Digit2');await a.waitForTimeout(400);assert.equal(await a.locator('.ammo>span').innerText(),'P-12');
+    await a.keyboard.down('KeyW');await a.locator('.pickup-prompt').waitFor({timeout:15000});await a.keyboard.up('KeyW');await a.keyboard.press('KeyE');await waitText('.ammo>span','V-40 SMG');
+    await a.keyboard.down('KeyC');await waitText('.hud-hint','CROUCHED');await a.screenshot({path:'artifacts/crouched.png'});await a.keyboard.up('KeyC');await a.waitForTimeout(200);
+    await a.mouse.down();await a.waitForTimeout(320);await a.mouse.up();await a.waitForFunction(()=>Number(document.querySelector('.ammo strong')?.textContent)<40,{},{timeout:10000});
+    const ammo=await a.locator('.ammo strong').innerText();assert.ok(Number(ammo)<40,'browser fire reduced authoritative ammunition');
+    await a.keyboard.press('KeyR');await waitText('.ammo strong','40');
+    await a.keyboard.press('Digit2');await waitText('.ammo>span','P-12');
+    await a.keyboard.press('Digit1');await waitText('.ammo>span','V-40 SMG');await a.keyboard.press('Digit2');await waitText('.ammo>span','P-12');
+    await a.evaluate(()=>document.dispatchEvent(new MouseEvent('mousemove',{movementY:650})));await a.keyboard.press('KeyG');await waitText('.grenade-count','1');await a.waitForFunction(()=>Number(document.querySelector('.health strong')?.textContent)<100,{},{timeout:8000});await a.evaluate(()=>document.dispatchEvent(new MouseEvent('mousemove',{movementY:-650})));await a.waitForTimeout(350);
+    const audio=await a.evaluate(()=>{const e=(window as any).__audioEvidence;return {state:e.context?.state,sources:e.sources,hits:e.hits};});assert.equal(audio.state,'running');assert.ok(audio.sources>8,'audio effects generated');assert.ok(audio.hits>0,'actual grenade damage displayed impact feedback');
     await a.screenshot({path:'artifacts/game.png'});
     await a.keyboard.down('Tab');await a.getByText('Field report.').waitFor();assert.ok((await a.locator('.table').innerText()).includes('Browser-Blue'));await a.screenshot({path:'artifacts/scoreboard.png'});await a.keyboard.up('Tab');
     await a.evaluate(()=>document.exitPointerLock());
     await a.getByRole('button',{name:'LEAVE ROOM'}).click();await b.getByRole('button',{name:'LEAVE ROOM'}).click();
+    await a.getByRole('button',{name:'Create a separate room instead'}).click();await a.getByRole('button',{name:'Relay The original outpost'}).click();await a.getByRole('button',{name:'CREATE A ROOM'}).click();await a.getByRole('button',{name:'EXPLORE THE ARENA'}).waitFor();assert.ok((await a.locator('.match-brand').innerText()).includes('RELAY'));await a.getByRole('button',{name:'LEAVE ROOM'}).click();
     await a.setViewportSize({width:390,height:844});await a.screenshot({path:'artifacts/mobile-lobby.png'});
-    assert.deepEqual(errors,[]);console.log(JSON.stringify({result:'PASS',base,checks:['WebGL-render','two-browser-join','pointer-lock','keyboard-movement','fire-ammo','reload','switch-weapons','scoreboard','leave-room','mobile-layout'],errors},null,2));
+    assert.deepEqual(errors,[]);console.log(JSON.stringify({result:'PASS',base,checks:['textured-WebGL-render','both-map-selections','two-browser-join','weapon-pickup','crouch','grenade-throw','damage-feedback-and-health','active-WebAudio-effects','pointer-lock','keyboard-movement','fire-ammo','reload','switch-weapons','scoreboard','leave-room','mobile-layout'],errors},null,2));
   }finally{await browser.close();}
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

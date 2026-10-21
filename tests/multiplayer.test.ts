@@ -14,6 +14,11 @@ test('real WebSocket clients: rooms, combat, reconnect, capacity, 8-player load 
     assert.equal((await fetch(base+'/health')).status,200);
     assert.equal((await fetch(base+'/matchmake/joinOrCreate/arena',{method:'POST'})).status,403);
     assert.equal((await reserve('Bad','tampered')).r.status,400);
+    const alternate=await fetch(base+'/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nickname:'Map-test',mapId:'relay'})});const alt=await alternate.json() as any;assert.equal(alt.mapId,'relay');
+    const altRoom=await new Client(ws).consumeSeatReservation(alt.reservation);altRoom.onMessage('snapshot',()=>{});clients.push(altRoom);assert.equal(activeRooms.get(altRoom.roomId)!.sim.mapId,'relay');
+    const other=await fetch(base+'/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nickname:'Map-guest',invite:alt.invite,mapId:'dunes'})});const otherData=await other.json() as any;assert.equal(otherData.mapId,'relay');
+    const guest=await new Client(ws).consumeSeatReservation(otherData.reservation);guest.onMessage('snapshot',()=>{});assert.equal(guest.roomId,altRoom.roomId);clients.push(guest);await guest.leave();await altRoom.leave();
+    clients.length=0;
     const a=await join('Alpha'),b=await join('Bravo');assert.equal(a.roomId,b.roomId);
     let state:Snapshot|undefined;let snapshots=0;a.onMessage('snapshot',(s:Snapshot)=>{state=s;snapshots++;});b.onMessage('snapshot',()=>{});
     await until(()=>!!state&&state.players.length===2);
