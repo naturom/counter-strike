@@ -1,0 +1,17 @@
+{
+  "name": "@sirocco/web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "next build --webpack"
+  },
+  "dependencies": {
+    "next": "16.4.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "three": "0.186.1",
+    "@dimforge/rapier3d-compat": "0.21.0",
+    "@sirocco/shared": "*",
+    "@colyseus/sdk": "0.18.5"
+  }
+}

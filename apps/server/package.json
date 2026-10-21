@@ -1,0 +1,11 @@
+{
+  "name": "@sirocco/server",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "@colyseus/core": "0.18.19",
+    "@colyseus/ws-transport": "0.18.4",
+    "@sirocco/shared": "*",
+    "next": "16.4.2"
+  }
+}
