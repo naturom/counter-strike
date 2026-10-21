@@ -30,7 +30,7 @@ export class ArenaRoom extends Room {
       if(!this.allow(client.sessionId)||!validInput(value))return;
       this.sim.input(client.sessionId,value);
       const p=this.sim.players.get(client.sessionId);
-      if(value.forward||value.strafe||value.fire||value.reload||value.jump||value.crouch||value.interact||value.grenade||p&&Math.abs(p.yaw-value.yaw)>0.01)this.idle.set(client.sessionId,Date.now());
+      if(value.forward||value.strafe||value.fire||value.reload||value.jump||value.crouch||value.interact||p&&Math.abs(p.yaw-value.yaw)>0.01)this.idle.set(client.sessionId,Date.now());
     });
     this.onMessage('rematch',(client)=>{
       if(!this.allow(client.sessionId)||this.sim.phase!=='finished')return;

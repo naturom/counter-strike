@@ -33,7 +33,7 @@ async function main(){
     const room=await new Client(base.replace(/^http/,'ws')).consumeSeatReservation(data.reservation);room.reconnection.enabled=false;const a:Agent={room,seq:0,updates:0};agents.push(a);room.onMessage('snapshot',(s:Snapshot)=>{a.state=s;a.updates++;});room.onMessage('combat',()=>{});room.onMessage('votes',()=>{});await until(()=>!!a.state);return a;
   }
   try{
-    assert.equal((await fetch(base+'/health')).status,200);const html=await (await fetch(base)).text();assert.match(html,/SIROCCO/);
+    assert.equal((await fetch(base+'/health')).status,200);const html=await (await fetch(base)).text();assert.match(html,/COUNTER STRIKE/);
     const a=await join('Verify-Red'),b=await join('Verify-Blue');assert.equal(a.room.roomId,b.room.roomId);
     assert.equal(a.state!.mapId,mapId);
     await drive(a,{x:-25,z:16});a.room.send('input',{...neutralInput(),seq:++a.seq,interact:true});await until(()=>a.state!.players.find(p=>p.id===a.room.sessionId)?.primary==='smg');
@@ -42,9 +42,9 @@ async function main(){
     await Promise.all([drive(a,{x:0,z:-4}),drive(b,{x:0,z:-8})]);
     const own=()=>a.state!.players.find(p=>p.id===a.room.sessionId)!,enemy=()=>a.state!.players.find(p=>p.id===b.room.sessionId)!;
     const fireStart=Date.now();while(enemy().hp>0){assert.ok(Date.now()-fireStart<5000,'live hitscan kill');const p=own(),q=enemy();a.room.send('input',{...neutralInput(),seq:++a.seq,yaw:Math.atan2(-(q.x-p.x),-(q.z-p.z)),fire:true});await wait(34);}
-    assert.equal(a.state!.scores.red,1);assert.equal(own().kills,1);assert.equal(enemy().deaths,1);await until(()=>enemy().hp===100,5000);
+    a.room.send('input',{...neutralInput(),seq:++a.seq,weapon:own().weapon});assert.equal(a.state!.scores.red,1);assert.equal(own().kills,1);assert.equal(enemy().deaths,1);await until(()=>enemy().hp===100,5000);
     await drive(b,{x:0,z:-8});let exploded=false;a.room.onMessage('combat',(e:any)=>{if(e.type==='explosion'&&e.shooter===a.room.sessionId)exploded=true;});
-    a.room.send('input',{...neutralInput(),seq:++a.seq,yaw:0,pitch:-1.2,grenade:true});await until(()=>own().grenades===1);await until(()=>exploded,5000);await until(()=>enemy().hp<100,2000);
+    a.room.send('input',{...neutralInput(),seq:++a.seq,yaw:0,pitch:-1.2,weapon:'grenade',fire:true});await until(()=>own().grenades===1);await until(()=>exploded,5000);await until(()=>enemy().hp<100,2000);
     const oldId=b.room.sessionId,token=b.room.reconnectionToken;b.room.connection.close();await wait(300);const rejoined=await new Client(base.replace(/^http/,'ws')).reconnect(token);rejoined.reconnection.enabled=false;rejoined.onMessage('combat',()=>{});rejoined.onMessage('votes',()=>{});rejoined.onMessage('snapshot',(s:Snapshot)=>b.state=s);b.room=rejoined;assert.equal(rejoined.sessionId,oldId);
     for(let i=2;i<8;i++)await join(`Verify-${i}`);
     const full=await fetch(base+'/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nickname:'Ninth',invite})});assert.equal(full.status,409);

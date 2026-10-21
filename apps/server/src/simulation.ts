@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {DT,RADIUS,ROUND_MS,WIN_SCORE,MAPS,DEFAULT_MAP,WEAPONS,direction,move,neutralInput,rayBox,wallDistance,heightOf,eyeOf,nearestPickup,type Input,type Player,type Snapshot,type CombatEvent,type Solid,type Team,type MapId,type Pickup,type Grenade,type Weapon,type Vec3} from '@sirocco/shared';
+import {DT,RADIUS,ROUND_MS,WIN_SCORE,MAPS,DEFAULT_MAP,WEAPONS,KNIFE,isGun,direction,move,neutralInput,rayBox,wallDistance,heightOf,eyeOf,nearestPickup,type Input,type Player,type Snapshot,type CombatEvent,type Solid,type Team,type MapId,type Pickup,type Grenade,type Equipment,type Vec3} from '@sirocco/shared';
 const freshAmmo=()=>({rifle:30,pistol:12,smg:0,marksman:0});
 export class Simulation {
   players=new Map<string,Player>();
@@ -7,7 +7,7 @@ export class Simulation {
   private lastSeq=new Map<string,number>();
   private nextShot=new Map<string,number>();
   private trigger=new Map<string,boolean>();
-  private actions=new Map<string,{interact:boolean;grenade:boolean;throwAt:number}>();
+  private actions=new Map<string,{interact:boolean;throwAt:number}>();
   private eventId=0;
   events:CombatEvent[]=[];
   scores={red:0,blue:0};
@@ -29,7 +29,7 @@ export class Simulation {
     const others=[...this.players.values()].filter(o=>o.id!==p.id&&o.hp>0);
     const spots=MAPS[this.mapId].spawns[p.team].map(s=>({s,safety:Math.min(...others.map(o=>Math.hypot(o.x-s.x,o.z-s.z)),100)}));spots.sort((a,b)=>b.safety-a.safety);
     Object.assign(p,spots[0].s,{hp:100,vy:0,grounded:true,crouched:false,ammo:freshAmmo(),weapon:'rifle',primary:'rifle',grenades:2,reloadUntil:0,respawnAt:0,protectedUntil:this.time+1500,yaw:p.team==='red'?0:Math.PI,pitch:0});
-    this.queues.set(p.id,[]);this.trigger.delete(p.id);this.actions.set(p.id,{interact:false,grenade:false,throwAt:0});this.nextShot.set(p.id,this.time+100);
+    this.queues.set(p.id,[]);this.trigger.delete(p.id);this.actions.set(p.id,{interact:false,throwAt:0});this.nextShot.set(p.id,this.time+100);
   }
   step(){
     this.time+=DT*1000;this.events=[];if(this.phase==='finished')return;
@@ -37,27 +37,32 @@ export class Simulation {
     for(const p of this.players.values()){
       if(this.winner!==null)break;
       if(p.hp<=0){if(this.time>=p.respawnAt)this.spawn(p);continue;}
-      if(p.reloadUntil&&this.time>=p.reloadUntil){p.ammo[p.weapon]=WEAPONS[p.weapon].magazine;p.reloadUntil=0;}
+      if(isGun(p.weapon)&&p.reloadUntil&&this.time>=p.reloadUntil){p.ammo[p.weapon]=WEAPONS[p.weapon].magazine;p.reloadUntil=0;}
       const i=this.queues.get(p.id)?.shift();
       const controls=i&&p.connected?i:{...neutralInput(),yaw:p.yaw,pitch:p.pitch,weapon:p.weapon,crouch:p.crouched};
       Object.assign(p,move(p,controls,this.solids));
       if(!i||!p.connected)continue;
       p.ack=i.seq;p.yaw=i.yaw;p.pitch=i.pitch;
-      if(i.weapon!==p.weapon&&(i.weapon===p.primary||i.weapon==='pistol')){p.weapon=i.weapon;p.reloadUntil=0;this.nextShot.set(p.id,Math.max(this.nextShot.get(p.id)??0,this.time+200));}
+      if(i.weapon!==p.weapon&&(i.weapon===p.primary||i.weapon==='pistol'||i.weapon==='knife'||i.weapon==='grenade')){p.weapon=i.weapon;p.reloadUntil=0;this.nextShot.set(p.id,Math.max(this.nextShot.get(p.id)??0,this.time+(isGun(p.weapon)?200:0)));}
       const action=this.actions.get(p.id)!;
       if(i.interact&&!action.interact)this.pickup(p);
-      if(i.grenade&&!action.grenade&&this.time>=action.throwAt&&p.grenades>0){this.throwGrenade(p);action.throwAt=this.time+600;}
-      action.interact=!!i.interact;action.grenade=!!i.grenade;
-      const w=WEAPONS[p.weapon];
-      if(i.reload&&!p.reloadUntil&&p.ammo[p.weapon]<w.magazine){p.reloadUntil=this.time+w.reload;this.emit('reload',p,p.weapon,this.eye(p),this.eye(p));}
+      action.interact=!!i.interact;
       const was=this.trigger.get(p.id)??false;
-      if(i.fire&&(!i.sprint||p.crouched)&&!p.reloadUntil&&p.ammo[p.weapon]>0&&(w.automatic||!was)&&this.time+.01>=(this.nextShot.get(p.id)??0))this.fire(p);
+      if(p.weapon==='grenade'){
+        if(i.fire&&!was&&this.time>=action.throwAt&&p.grenades>0){this.throwGrenade(p);action.throwAt=this.time+600;}
+      }else if(p.weapon==='knife'){
+        if(i.fire&&!was&&this.time+.01>=(this.nextShot.get(p.id)??0))this.fire(p);
+      }else{
+        const w=WEAPONS[p.weapon];
+        if(i.reload&&!p.reloadUntil&&p.ammo[p.weapon]<w.magazine){p.reloadUntil=this.time+w.reload;this.emit('reload',p,p.weapon,this.eye(p),this.eye(p));}
+        if(i.fire&&(!i.sprint||p.crouched)&&!p.reloadUntil&&p.ammo[p.weapon]>0&&(w.automatic||!was)&&this.time+.01>=(this.nextShot.get(p.id)??0))this.fire(p);
+      }
       this.trigger.set(p.id,i.fire);
     }
     if(this.phase==='playing')this.stepGrenades();
   }
   private eye(p:Player):Vec3{return{x:p.x,y:p.y+eyeOf(p),z:p.z};}
-  private emit(type:CombatEvent['type'],p:{id:string;team:Team},weapon:Weapon|'grenade',from:Vec3,to:Vec3,extra:Partial<CombatEvent>={}){this.events.push({type,id:++this.eventId,shooter:p.id,team:p.team,weapon,from:{...from},to:{...to},...extra});}
+  private emit(type:CombatEvent['type'],p:{id:string;team:Team},weapon:Equipment,from:Vec3,to:Vec3,extra:Partial<CombatEvent>={}){this.events.push({type,id:++this.eventId,shooter:p.id,team:p.team,weapon,from:{...from},to:{...to},...extra});}
   pickup(p:Player){
     const pickup=nearestPickup(p,this.pickups,this.time,this.solids);if(!pickup)return;
     if(p.primary!=='rifle')p.ammo[p.primary]=0;
@@ -66,8 +71,8 @@ export class Simulation {
     this.emit('pickup',p,p.weapon,p,p,{target:p.id});
   }
   fire(p:Player){
-    const w=WEAPONS[p.weapon];p.ammo[p.weapon]--;this.nextShot.set(p.id,this.time+w.interval);p.protectedUntil=0;
-    const from=this.eye(p),dir=direction(p.yaw,p.pitch);let distance=wallDistance(from,dir,this.solids),target:Player|undefined;
+    if(p.weapon==='grenade')return;const w=p.weapon==='knife'?KNIFE:WEAPONS[p.weapon];if(isGun(p.weapon))p.ammo[p.weapon]--;this.nextShot.set(p.id,this.time+w.interval);p.protectedUntil=0;
+    const from=this.eye(p),dir=direction(p.yaw,p.pitch);let distance=Math.min(p.weapon==='knife'?KNIFE.range:150,wallDistance(from,dir,this.solids)),target:Player|undefined;
     for(const other of this.players.values()){
       if(other.id===p.id||other.hp<=0)continue;
       const t=rayBox(from,dir,{x:other.x-RADIUS,y:other.y,z:other.z-RADIUS},{x:other.x+RADIUS,y:other.y+heightOf(other),z:other.z+RADIUS});
@@ -75,9 +80,9 @@ export class Simulation {
     }
     const to={x:from.x+dir.x*distance,y:from.y+dir.y*distance,z:from.z+dir.z*distance};
     const hit=target&&target.team!==p.team&&target.protectedUntil<=this.time?target:undefined;
-    this.emit('shot',p,p.weapon,from,to,{target:hit?.id});if(hit)this.damage(hit,w.damage,p,p.weapon,from);
+    this.emit(p.weapon==='knife'?'melee':'shot',p,p.weapon,from,to,{target:hit?.id});if(hit)this.damage(hit,w.damage,p,p.weapon,from);
   }
-  damage(victim:Player,amount:number,attacker:{id:string;team:Team},weapon:Weapon|'grenade',from:Vec3){
+  damage(victim:Player,amount:number,attacker:{id:string;team:Team},weapon:Equipment,from:Vec3){
     if(this.phase!=='playing'||victim.hp<=0||victim.protectedUntil>this.time||victim.team===attacker.team&&victim.id!==attacker.id)return;
     const dealt=Math.min(victim.hp,Math.max(0,Math.round(amount)));if(!dealt)return;victim.hp-=dealt;
     this.emit('damage',attacker,weapon,from,this.eye(victim),{target:victim.id,damage:dealt,hp:victim.hp});

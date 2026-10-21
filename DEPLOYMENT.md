@@ -6,20 +6,21 @@
 - Alternative service URL: https://desert-fps-nrihwi5oja-as.a.run.app
 - **Project:** `nood-429501` (project number `479916246177`)
 - **Region / service:** `asia-southeast1` / `desert-fps`
-- **Ready revision:** `desert-fps-00002-zs8`, serving 100% of traffic.
-- **Cloud Build:** `61df7f12-86ba-4ad3-a072-3fbd8fb5b9a1`, status `SUCCESS`.
-- [Build record and logs](https://console.cloud.google.com/cloud-build/builds/61df7f12-86ba-4ad3-a072-3fbd8fb5b9a1?project=479916246177)
-- Image: `asia-southeast1-docker.pkg.dev/nood-429501/desert-fps/game:20261021-03`
-- Deployed immutable digest: `sha256:dd6580b48145cba23b095c3eb9534e256cc405e42879922d33b74bb8a9701551`
+- **Ready revision:** `desert-fps-00003-nvv`, serving 100% of traffic.
+- **Cloud Build:** `dca73ca3-7020-4158-81d0-1fdd9d03e323`, status `SUCCESS`.
+- [Build record and logs](https://console.cloud.google.com/cloud-build/builds/dca73ca3-7020-4158-81d0-1fdd9d03e323?project=479916246177)
+- Image: `asia-southeast1-docker.pkg.dev/nood-429501/desert-fps/game:20261022-01`
+- Deployed immutable digest: `sha256:2e5f175a38ccefb39cfaa2aa70f0aee186e30b272b3b692a69cc21b55982bcb6`
 
 The game source is in this workspace. See [README](README.md) for local commands, architecture, controls, limitations, logs and deletion commands. The image was built and pushed by Google Cloud Build, and deployed by digest. This release updates the existing game service and reuses its registry, runtime account and signing secret. No new database or running service was added.
 
 ## New in this release
 
-- Dunes is the default map, with Dust II inspired routes; Relay remains selectable. Map choice is signed into the invitation. Invitations from release 1 retain Relay.
-- CC0 sandstone/sand surface textures, procedural sky, directional lighting, environmental details and batched scenery. See [asset sources](ASSETS.md).
-- Reload, footstep, weapon, grenade, pickup and damage sounds with positional attenuation.
-- Two weapon slots, SMG/DMR pickups, two bouncing frag grenades per life, crouch movement/hitboxes, damage direction and remaining-health feedback.
+- Renamed the lobby, in-game header and browser title to **Counter Strike**.
+- Equipment slots: **1 knife**, **2 primary gun**, **3 pistol**, **4 grenade**. Left click uses the selected item. G no longer throws grenades.
+- Knife attacks have a 1.8-metre range, 40 damage and a half-second cooldown, with a viewmodel, swing animation and sound. They respect cover, friendly-fire rules and spawn protection.
+- Selecting a grenade does not throw it. Each fresh mouse click throws one; holding the button cannot throw both. The HUD shows the selected slot and remaining supply.
+- Dunes/Relay, weapon pickups, crouching, textures, sounds and health feedback from the previous release remain available.
 
 ## Actual settings inspected after deployment
 
@@ -45,10 +46,10 @@ No database, Redis, VM service, GPU, external keep-warm requests or always-on wo
 
 - Typecheck: passed.
 - Production Next.js and combined Node server build: passed locally and in Cloud Build's Linux container.
-- Unit/integration/restart suite: **23 passed, 0 failed**. Includes input validation, collision, weapon rules, hits/deaths, respawns, score, round end/rematch, eight-player limits, balance, real WebSocket reconnection and signed invitation reuse after a real server-process restart.
+- Unit/integration/restart suite: **27 passed, 0 failed**. Includes input validation, collision, weapon rules, hits/deaths, respawns, score, round end/rematch, eight-player limits, balance, real WebSocket reconnection and signed invitation reuse after a real server-process restart.
 - Local eight-client integration run: **20 snapshots/second**, 30 control messages/second per client, three-second sampled load interval.
-- Public API smoke tests: **PASS on both Dunes and Relay**, 34 seconds per map. Homepage, `/health`, signed creation/join and map selection, weapon pickup, crouch, grenade blast damage, navigation, real hitscan kill, score, respawn, reconnection, eight clients and rejection of a ninth. Both five-second eight-client samples measured **20 snapshots/second**.
-- Public two-browser test: **PASS**, no page errors. Textured WebGL rendering, both map selections, joining the same room, pointer lock, keyboard input, pickups, crouching, firing with authoritative ammunition reduction, reload, weapon switch, grenade throw and real damage/health feedback, active Web Audio effects, scoreboard, leaving and responsive lobby layout.
+- Public API smoke test: **PASS on Dunes**, 34 seconds. Homepage, `/health`, signed creation/join and map selection, weapon pickup, crouch, grenade blast damage, navigation, real hitscan kill, score, respawn, reconnection, eight clients and rejection of a ninth. The five-second eight-client sample measured **20 snapshots/second**.
+- Public two-browser test: **PASS**, no page errors. Textured WebGL rendering, both map selections, joining the same room, pointer lock, keyboard input, pickups, crouching, firing with authoritative ammunition reduction, reload, all four equipment slots, knife selection/slash, grenade selection followed by mouse throwing (including held-click protection), and real damage/health feedback, active Web Audio effects, scoreboard, leaving and responsive lobby layout.
 - Final `/health`: `{"ok":true,"service":"desert-fps","rooms":0,"version":"2.0.0"}`.
 - Query for service runtime logs with severity ERROR or higher returned no entries for the verification period.
 

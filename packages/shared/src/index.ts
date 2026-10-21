@@ -1,5 +1,8 @@
 export type Team = 'red' | 'blue';
 export type Weapon = 'rifle' | 'pistol' | 'smg' | 'marksman';
+export type Equipment = Weapon | 'knife' | 'grenade';
+export const KNIFE = {damage:40,range:1.8,interval:500} as const;
+export const isGun = (weapon:Equipment):weapon is Weapon => weapon!=='knife'&&weapon!=='grenade';
 export type MapId = 'dunes' | 'relay';
 export type Vec3 = { x: number; y: number; z: number };
 export const TICK_RATE = 30, DT = 1 / TICK_RATE, SNAPSHOT_RATE = 20;
@@ -11,7 +14,7 @@ export const WEAPONS = {
   smg: { damage: 17, interval: 1000 / 900, magazine: 40, reload: 1500, label: 'V-40 SMG', automatic: true },
   marksman: { damage: 70, interval: 650, magazine: 8, reload: 2400, label: 'DMR-8', automatic: false },
 } as const;
-export const weaponLabel = (weapon: Weapon | 'grenade') => weapon === 'grenade' ? 'FRAG' : WEAPONS[weapon].label;
+export const weaponLabel = (weapon: Equipment) => weapon === 'knife' ? 'KNIFE' : weapon === 'grenade' ? 'FRAG' : WEAPONS[weapon].label;
 export type Solid = { x: number; y: number; z: number; w: number; h: number; d: number; kind: 'wall' | 'crate' | 'roof' };
 const block = (x: number, z: number, w: number, d: number, h = 5, kind: Solid['kind'] = 'wall', y = h / 2): Solid => ({ x, y, z, w, h, d, kind });
 // Original "Relay" arena: offset courtyards around a central open route,
@@ -58,18 +61,18 @@ export const MAPS:Record<MapId,MapDefinition>={
 export const DEFAULT_MAP:MapId='dunes';
 export const validMap = (value:unknown):value is MapId => value==='dunes'||value==='relay';
 export const SOLIDS=MAPS[DEFAULT_MAP].solids, SPAWNS=COMMON_SPAWNS;
-export interface Input {seq:number;forward:number;strafe:number;yaw:number;pitch:number;jump:boolean;sprint:boolean;fire:boolean;reload:boolean;weapon:Weapon;crouch:boolean;interact:boolean;grenade:boolean;}
-export const neutralInput=():Input=>({seq:0,forward:0,strafe:0,yaw:0,pitch:0,jump:false,sprint:false,fire:false,reload:false,weapon:'rifle',crouch:false,interact:false,grenade:false});
+export interface Input {seq:number;forward:number;strafe:number;yaw:number;pitch:number;jump:boolean;sprint:boolean;fire:boolean;reload:boolean;weapon:Equipment;crouch:boolean;interact:boolean;}
+export const neutralInput=():Input=>({seq:0,forward:0,strafe:0,yaw:0,pitch:0,jump:false,sprint:false,fire:false,reload:false,weapon:'rifle',crouch:false,interact:false});
 export interface Motion extends Vec3 {vy:number;grounded:boolean;crouched?:boolean;}
-export interface Player extends Motion {id:string;name:string;team:Team;yaw:number;pitch:number;hp:number;kills:number;deaths:number;weapon:Weapon;primary:Weapon;ammo:Record<Weapon,number>;grenades:number;crouched:boolean;reloadUntil:number;respawnAt:number;protectedUntil:number;connected:boolean;ack:number;}
+export interface Player extends Motion {id:string;name:string;team:Team;yaw:number;pitch:number;hp:number;kills:number;deaths:number;weapon:Equipment;primary:Weapon;ammo:Record<Weapon,number>;grenades:number;crouched:boolean;reloadUntil:number;respawnAt:number;protectedUntil:number;connected:boolean;ack:number;}
 export interface Grenade extends Vec3 {id:number;owner:string;team:Team;vx:number;vy:number;vz:number;explodeAt:number;}
 export interface Snapshot {mapId:MapId;matchId:string;round:number;time:number;endsAt:number;phase:'playing'|'finished';winner:Team|'draw'|null;scores:Record<Team,number>;players:Player[];pickups:Pickup[];grenades:Grenade[];}
-export interface CombatEvent {type:'shot'|'kill'|'damage'|'reload'|'pickup'|'grenade'|'explosion';id:number;shooter:string;target?:string;name?:string;victim?:string;team:Team;weapon:Weapon|'grenade';from:Vec3;to:Vec3;damage?:number;hp?:number;}
+export interface CombatEvent {type:'shot'|'melee'|'kill'|'damage'|'reload'|'pickup'|'grenade'|'explosion';id:number;shooter:string;target?:string;name?:string;victim?:string;team:Team;weapon:Equipment;from:Vec3;to:Vec3;damage?:number;hp?:number;}
 export function validInput(value:unknown):value is Input {
   if(!value||typeof value!=='object')return false;const i=value as Input;
   return Number.isSafeInteger(i.seq)&&i.seq>=0&&i.seq<2**31&&Number.isFinite(i.forward)&&Math.abs(i.forward)<=1&&Number.isFinite(i.strafe)&&Math.abs(i.strafe)<=1&&Number.isFinite(i.yaw)&&Math.abs(i.yaw)<=Math.PI*2&&Number.isFinite(i.pitch)&&Math.abs(i.pitch)<=1.5&&
     ['jump','sprint','fire','reload'].every(k=>typeof (i as any)[k]==='boolean')&&
-    ['crouch','interact','grenade'].every(k=>(i as any)[k]===undefined||typeof (i as any)[k]==='boolean')&&Object.hasOwn(WEAPONS,i.weapon);
+    ['crouch','interact'].every(k=>(i as any)[k]===undefined||typeof (i as any)[k]==='boolean')&&(i.weapon==='knife'||i.weapon==='grenade'||Object.hasOwn(WEAPONS,i.weapon));
 }
 export const heightOf=(p:{crouched?:boolean})=>p.crouched?CROUCH_HEIGHT:HEIGHT;
 export const eyeOf=(p:{crouched?:boolean})=>p.crouched?CROUCH_EYE:EYE;

@@ -14,6 +14,7 @@ export class GameAudio {
   shot(weapon:Weapon,at?:Vec3){const profile={rifle:[1800,.3,145,.5],pistol:[2400,.19,190,.38],smg:[2900,.16,175,.32],marksman:[950,.6,90,.8]}[weapon];this.burst(.09,.8,profile[0],at);this.burst(profile[1],.34,450,at,.015,'lowpass');this.tone(profile[2],40,.15,profile[3],at);}
   reload(duration:number,at?:Vec3){this.burst(.1,.35,2300,at);this.tone(500,240,.06,.1,at);this.burst(.14,.3,950,at,duration*.52);this.burst(.1,.5,2700,at,duration*.86);this.tone(850,320,.06,.1,at,duration*.9);}
   step(crouched:boolean,at?:Vec3){this.burst(.14,crouched?.045:.12,1400,at,0,'lowpass');this.tone(100,42,.07,crouched?.025:.065,at);}
+  knife(at?:Vec3){this.burst(.16,.22,1800,at,0,'highpass');}
   hurt(){this.burst(.18,.3,650);this.tone(90,34,.23,.4);}
   heartbeat(){this.tone(63,38,.16,.16);this.tone(58,32,.13,.1,undefined,.2);}
   pickup(){this.tone(580,950,.09,.1);this.burst(.07,.2,2400);}

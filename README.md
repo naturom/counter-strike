@@ -1,4 +1,4 @@
-# SIROCCO — Dunes & Relay
+# Counter Strike — Dunes & Relay
 
 An original desktop browser multiplayer FPS, implemented with Next.js, TypeScript, Three.js, Rapier and an authoritative Colyseus server. Choose between **Dunes** (default), an original desert map inspired by Dust II’s long lane, mid gates, courtyards and tunnel flank, and **Relay**, the original outpost. Layouts and models are original; no Valve game assets are included. PBR sandstone and sand textures are CC0 from Poly Haven; see [asset sources](ASSETS.md).
 
@@ -11,17 +11,20 @@ Click **Enter the arena** to capture your mouse. Escape releases it.
 | Control | Action |
 | --- | --- |
 | W A S D / mouse | Move / look |
-| Left click | Fire; hold for rifle/SMG, click for pistol/DMR |
+| Left click | Use selected item: slash, fire, or throw; hold for rifle/SMG |
 | Space / Shift | Jump / sprint (cannot fire while sprinting) |
 | R | Reload |
-| 1 / 2 | Equipped primary / pistol |
+| 1 | Knife |
+| 2 / 3 | Equipped primary gun / pistol |
 | E | Pick up a nearby gun (replaces primary) |
-| G | Throw a frag grenade |
+| 4, then left click | Select and throw a frag grenade |
 | C / Ctrl | Hold to crouch |
 | Tab | Hold scoreboard |
 | Escape | Menu, invite, leave |
 
 Each round lasts ten minutes or ends at 30 kills. Players have 100 HP, respawn in three seconds, and cannot damage teammates. Respawns receive 1.5 seconds of protection, cancelled by firing or throwing a grenade. Rifle: 25 damage, 600 RPM, 30 rounds, 1.8-second reload. Pistol: 20 damage, maximum 300 RPM, 12 rounds, 1.2-second reload. Ammunition reserves are unlimited; magazines and reload times are enforced. Half the connected players must vote to start a rematch.
+
+The knife deals 40 damage within 1.8 metres, with one slash per click and a half-second cooldown. Solid cover, friendly-fire rules and spawn protection apply. It uses no ammunition. Selecting a grenade does not throw it; left-click throws one, and an empty grenade slot shows zero remaining.
 
 Weapon racks offer a 40-round SMG (17 damage, 900 RPM, 1.5-second reload) and an 8-round DMR (70 damage, 2.4-second reload). A pickup replaces your primary while retaining your pistol; each rack replenishes after 20 seconds. Respawning restores rifle, pistol and two grenades. Grenades bounce, explode after 2.2 seconds, and apply distance-based damage within eight metres, respecting solid cover. They can hurt their thrower but not teammates.
 

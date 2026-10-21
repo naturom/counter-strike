@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import {MAPS,type MapId,type Weapon} from '@sirocco/shared';
+import {MAPS,type MapId,type Equipment} from '@sirocco/shared';
 export function disposeGroup(group:THREE.Object3D){group.traverse(o=>{if(o instanceof THREE.Mesh||o instanceof THREE.Line)o.geometry.dispose();});group.removeFromParent();}
 export class WorldArt {
   materials:THREE.Material[]=[];textures:THREE.Texture[]=[];
@@ -64,8 +64,20 @@ export class WorldArt {
     return root;
   }
   private palm(root:THREE.Group,x:number,z:number){const trunk=this.wood,leaf=this.material('#64704b',{side:THREE.DoubleSide});this.cylinder(root,.15,.28,6.7,trunk,x,3.35,z);for(let i=0;i<9;i++){const g=new THREE.Group();g.position.set(x,6.5,z);g.rotation.y=i*Math.PI*2/9;for(let j=0;j<8;j++){const mesh=new THREE.Mesh(new THREE.PlaneGeometry(.7-j*.06,.75),leaf);mesh.position.set(0,-j*j*.022,-j*.38);mesh.rotation.x=-Math.PI/2-j*.07;mesh.rotation.z=(j%2?.12:-.12);g.add(mesh);}root.add(g);}}
-  weapon(kind:Weapon,viewmodel=true){
+  weapon(kind:Equipment,viewmodel=true){
     const g=new THREE.Group(),steel=this.metal,poly=this.dark,wood=this.wood;const pistol=kind==='pistol',smg=kind==='smg',dmr=kind==='marksman';
+    if(kind==='knife'){
+      this.box(g,.08,.085,.22,poly,0,0,.02);this.box(g,.22,.035,.045,steel,0,0,-.11);
+      const shape=new THREE.Shape();shape.moveTo(-.045,0);shape.lineTo(.045,0);shape.lineTo(.04,.31);shape.lineTo(0,.44);shape.lineTo(-.04,.31);shape.closePath();
+      const blade=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:.018,bevelEnabled:true,bevelSegments:1,steps:1,bevelSize:.004,bevelThickness:.004}),steel);blade.rotation.x=-Math.PI/2;blade.position.set(0,0,-.13);g.add(blade);
+      if(viewmodel)this.box(g,.14,.13,.18,this.wood,.02,-.055,.035);return g;
+    }
+    if(kind==='grenade'){
+      const shell=new THREE.Mesh(new THREE.SphereGeometry(.105,12,10),poly);shell.scale.y=1.25;shell.position.y=.02;g.add(shell);
+      this.box(g,.065,.07,.065,steel,0,.16,0);this.box(g,.035,.2,.03,steel,.09,.1,0);
+      const ring=new THREE.Mesh(new THREE.TorusGeometry(.045,.008,6,16),steel);ring.position.set(-.065,.18,0);g.add(ring);
+      if(viewmodel)this.box(g,.15,.11,.14,this.wood,.01,-.08,.04);return g;
+    }
     this.box(g,.12,.14,pistol?.24:smg?.39:.57,steel,0,.02,-.08);
     this.box(g,.09,.22,.1,poly,0,-.13,.01).rotation.x=-.22;
     if(!pistol){this.box(g,.09,.2,dmr?.12:.17,poly,0,-.14,-.15).rotation.x=.15;this.box(g,.1,.13,.24,dmr?wood:poly,0,0,.29);this.box(g,.13,.18,.06,poly,0,-.015,.4);this.box(g,.13,.13,.25,poly,0,.015,-.36);}
