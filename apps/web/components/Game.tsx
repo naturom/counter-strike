@@ -52,7 +52,11 @@ export default function Game(){
     }catch(e){setError((e as Error).message);setStatus('');}finally{setBusy(false);}
   }
   async function share(){try{await navigator.clipboard.writeText(location.href);setCopied(true);setTimeout(()=>setCopied(false),1800);}catch{setNotice(`Copy this address from your browser to invite a friend.`);}}
-  function leave(){intentional.current=true;void room.current?.leave();room.current=null;arena.current?.stop();setPlaying(false);setSnap(null);setBoard(false);setPickup('');setHurt(false);setStatus('');sessionStorage.removeItem('sirocco-reconnect');}
+  function leave(){
+    intentional.current=true;const previous=room.current;room.current=null;void previous?.leave();arena.current?.stop();
+    inviteRef.current='';setInvite('');history.replaceState(null,'','/');sessionStorage.removeItem('sirocco-reconnect');
+    setPlaying(false);setSnap(null);setBoard(false);setPickup('');setHurt(false);setStatus('');setError('');setNotice('');setFeed([]);setVotes('');setCopied(false);
+  }
   const me=snap?.players.find(p=>p.id===room.current?.sessionId);const remaining=snap?Math.max(0,Math.ceil((snap.endsAt-snap.time)/1000)):600;const time=`${String(Math.floor(remaining/60)).padStart(2,'0')}:${String(remaining%60).padStart(2,'0')}`;
   const map=MAPS[snap?.mapId??selectedMap];
   return <main className={playing?'app in-game':'app'}>

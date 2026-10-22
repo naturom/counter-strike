@@ -6,21 +6,19 @@
 - Alternative service URL: https://desert-fps-nrihwi5oja-as.a.run.app
 - **Project:** `nood-429501` (project number `479916246177`)
 - **Region / service:** `asia-southeast1` / `desert-fps`
-- **Ready revision:** `desert-fps-00003-nvv`, serving 100% of traffic.
-- **Cloud Build:** `dca73ca3-7020-4158-81d0-1fdd9d03e323`, status `SUCCESS`.
-- [Build record and logs](https://console.cloud.google.com/cloud-build/builds/dca73ca3-7020-4158-81d0-1fdd9d03e323?project=479916246177)
-- Image: `asia-southeast1-docker.pkg.dev/nood-429501/desert-fps/game:20261022-01`
-- Deployed immutable digest: `sha256:2e5f175a38ccefb39cfaa2aa70f0aee186e30b272b3b692a69cc21b55982bcb6`
+- **Ready revision:** `desert-fps-00004-hlz`, serving 100% of traffic.
+- **Cloud Build:** `8c3858d9-b163-45d7-bd5d-5b857146016e`, status `SUCCESS`.
+- [Build record and logs](https://console.cloud.google.com/cloud-build/builds/8c3858d9-b163-45d7-bd5d-5b857146016e?project=479916246177)
+- Image: `asia-southeast1-docker.pkg.dev/nood-429501/desert-fps/game:20261022-02`
+- Deployed immutable digest: `sha256:27b4bfd0e35e794cffd3b97b23b504ef5d9cba4be6a8b37915d52c5c2e809569`
 
 The game source is in this workspace. See [README](README.md) for local commands, architecture, controls, limitations, logs and deletion commands. The image was built and pushed by Google Cloud Build, and deployed by digest. This release updates the existing game service and reuses its registry, runtime account and signing secret. No new database or running service was added.
 
 ## New in this release
 
-- Renamed the lobby, in-game header and browser title to **Counter Strike**.
-- Equipment slots: **1 knife**, **2 primary gun**, **3 pistol**, **4 grenade**. Left click uses the selected item. G no longer throws grenades.
-- Knife attacks have a 1.8-metre range, 40 damage and a half-second cooldown, with a viewmodel, swing animation and sound. They respect cover, friendly-fire rules and spawn protection.
-- Selecting a grenade does not throw it. Each fresh mouse click throws one; holding the button cannot throw both. The HUD shows the selected slot and remaining supply.
-- Dunes/Relay, weapon pickups, crouching, textures, sounds and health feedback from the previous release remain available.
+- Leaving a room clears the invitation from the URL and lobby state, and removes the stored reconnection token.
+- Both map buttons are immediately available again. Selecting another map creates a fresh room with a different invitation.
+- Previous room notices, kill feed, votes and copy-link status are cleared when returning to the lobby.
 
 ## Actual settings inspected after deployment
 
@@ -47,9 +45,9 @@ No database, Redis, VM service, GPU, external keep-warm requests or always-on wo
 - Typecheck: passed.
 - Production Next.js and combined Node server build: passed locally and in Cloud Build's Linux container.
 - Unit/integration/restart suite: **27 passed, 0 failed**. Includes input validation, collision, weapon rules, hits/deaths, respawns, score, round end/rematch, eight-player limits, balance, real WebSocket reconnection and signed invitation reuse after a real server-process restart.
-- Local eight-client integration run: **20 snapshots/second**, 30 control messages/second per client, three-second sampled load interval.
-- Public API smoke test: **PASS on Dunes**, 34 seconds. Homepage, `/health`, signed creation/join and map selection, weapon pickup, crouch, grenade blast damage, navigation, real hitscan kill, score, respawn, reconnection, eight clients and rejection of a ninth. The five-second eight-client sample measured **20 snapshots/second**.
-- Public two-browser test: **PASS**, no page errors. Textured WebGL rendering, both map selections, joining the same room, pointer lock, keyboard input, pickups, crouching, firing with authoritative ammunition reduction, reload, all four equipment slots, knife selection/slash, grenade selection followed by mouse throwing (including held-click protection), and real damage/health feedback, active Web Audio effects, scoreboard, leaving and responsive lobby layout.
+- Cloud Build reran all 27 tests, including real WebSocket multiplayer and server restart coverage.
+- Targeted public Chrome verification: **PASS**, no page errors. Created-room and invited-room exits clear the URL and reconnection storage, both map buttons unlock, changing from Dunes to Relay creates a different invitation and the correct map, and refreshing after leaving retains a clean lobby.
+- Service settings compared before and after the image update: resource limits, concurrency, timeout, runtime identity, secret references, startup probe, CPU throttling, minimum/maximum instances and session affinity are unchanged.
 - Final `/health`: `{"ok":true,"service":"desert-fps","rooms":0,"version":"2.0.0"}`.
 - Query for service runtime logs with severity ERROR or higher returned no entries for the verification period.
 
