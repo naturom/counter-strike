@@ -1,6 +1,17 @@
-# Verified deployment — 22 October 2026 (Singapore)
+# Verified deployment — 23 October 2026 (Singapore)
 
-## Current release: Dust II reconstruction
+## Current release: map surface and escape-route repairs
+
+- **Play:** https://desert-fps-479916246177.asia-southeast1.run.app
+- Source commit: `1923c42` (includes the earlier lobby cleanup).
+- **Ready revision:** `desert-fps-00006-mhn`, serving 100% of traffic.
+- **Cloud Build:** `21a9d15c-30ff-4202-823e-1c335aa190e2`, status `SUCCESS` ([build record](https://console.cloud.google.com/cloud-build/builds/21a9d15c-30ff-4202-823e-1c335aa190e2?project=479916246177)).
+- Image: `asia-southeast1-docker.pkg.dev/nood-429501/desert-fps/game:20261023-map-repairs-01`.
+- Immutable digest: `sha256:447d6a9df1deca13120c96d0064f57d6b5c7fb19fc6e35e03b2ef4115605f6c4`.
+
+This release fills terrain gaps, repairs return routes from Pit and other side pockets, removes covered/coplanar floor faces, and fixes movement jitter at ramp/landing edges. Cloud Build passed typecheck, all **52 tests**, and the production build. The tests include movement in both directions through ten former trap areas, sampled surface return paths, and rendered/collision floor agreement. Public browser verification confirmed the cleaned lobby, repaired A platform preview, room creation, radar, and room exit to a clean URL. The public health endpoint returned `{"ok":true,"service":"desert-fps","rooms":0,"version":"2.0.0"}` before the room check. Resource limits, scale settings, runtime identity and secret references match the prior release.
+
+## Previous release: Dust II reconstruction
 
 - **Play:** https://desert-fps-479916246177.asia-southeast1.run.app
 - **Ready revision:** `desert-fps-00005-w5s`, serving 100% of traffic.
