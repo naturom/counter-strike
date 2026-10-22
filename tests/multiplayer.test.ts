@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {Client, type Room} from '@colyseus/sdk';
 import {createGameServer} from '../apps/server/src/http';
 import {activeRooms} from '../apps/server/src/rooms';
-import {neutralInput,type Snapshot} from '@sirocco/shared';
+import {neutralInput,dustPoint,type Snapshot} from '@sirocco/shared';
 const delay=(ms:number)=>new Promise(r=>setTimeout(r,ms));
 async function until(fn:()=>boolean,timeout=4000){const start=Date.now();while(!fn()){if(Date.now()-start>timeout)throw new Error('Timed out waiting for network state');await delay(25);}}
 test('real WebSocket clients: rooms, combat, reconnect, capacity, 8-player load and fresh invite room',{timeout:30000},async()=>{
@@ -25,7 +25,7 @@ test('real WebSocket clients: rooms, combat, reconnect, capacity, 8-player load 
     const sim=activeRooms.get(a.roomId)!.sim;
     const pa=sim.players.get(a.sessionId)!,pb=sim.players.get(b.sessionId)!;
     // Deterministic fixture positions injected only inside this in-process test. No network test hooks exist.
-    Object.assign(pa,{x:0,y:0,z:0,yaw:0,protectedUntil:0});Object.assign(pb,{x:0,y:0,z:-4,protectedUntil:0});
+    Object.assign(pa,{...dustPoint(380,930,3.2),yaw:0,protectedUntil:0});Object.assign(pb,{...dustPoint(380,900,3.2),protectedUntil:0});
     let seq=0;const firing=setInterval(()=>a.send('input',{...neutralInput(),seq:++seq,fire:true}),1000/30);
     await until(()=>state?.players.find(p=>p.id===b.sessionId)?.hp===0);clearInterval(firing);assert.equal(state!.scores.red,1);
     await until(()=>state?.players.find(p=>p.id===b.sessionId)?.hp===100,4500);

@@ -2,11 +2,14 @@ import * as THREE from 'three';
 import {Sky} from 'three/examples/jsm/objects/Sky.js';
 import RAPIER from '@dimforge/rapier3d-compat';
 import {MAPS,DEFAULT_MAP,DT,move,neutralInput,eyeOf,nearestPickup,weaponLabel,isGun,type MapId,type Equipment,type Motion,type Input,type Snapshot,type Player,type CombatEvent} from '@sirocco/shared';
+import {MAP_TOUR} from './map-tour';
+import {solidGeometry} from './map-geometry';
 import {GameAudio} from './audio';
 import {WorldArt,disposeGroup} from './world';
 export interface ArenaCallbacks {input:(i:Input)=>void;lock:(locked:boolean)=>void;board:(show:boolean)=>void;pickup:(label:string)=>void;damage:(angle:number)=>void;}
 export class Arena {
-  scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(76,1,.06,240);renderer:THREE.WebGLRenderer;
+  scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(76,1,.06,350);renderer:THREE.WebGLRenderer;
+  private tourIndex:number|null=null;
   private art:WorldArt;private audio=new GameAudio();private world?:RAPIER.World;private physicsReady=false;
   private mapId:MapId=DEFAULT_MAP;private roots=new Map<MapId,THREE.Group>();private mapRoot?:THREE.Group;
   private avatars=new Map<string,THREE.Group>();private gunModels=new Map<Equipment,THREE.Group>();private gun=new THREE.Group();private gunKind:Equipment='rifle';
@@ -22,10 +25,10 @@ export class Arena {
   private observer:ResizeObserver;private reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
   constructor(private canvas:HTMLCanvasElement,private callbacks:ArenaCallbacks){
     this.renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));
-    this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFSoftShadowMap;this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=.9;
-    this.art=new WorldArt(this.renderer);this.scene.fog=new THREE.Fog('#c4bca6',65,170);
-    const sky=new Sky();sky.scale.setScalar(200);const u=sky.material.uniforms;u.turbidity.value=5;u.rayleigh.value=1.4;u.mieCoefficient.value=.005;u.mieDirectionalG.value=.8;u.sunPosition.value.set(-35,42,28);this.scene.add(sky);
-    this.scene.add(new THREE.HemisphereLight('#c8ddf1','#8f7456',.7));const sun=new THREE.DirectionalLight('#ffe7c0',3.1);sun.position.set(-35,42,28);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-42,right:42,top:38,bottom:-38,near:1,far:115});sun.shadow.camera.updateProjectionMatrix();sun.shadow.normalBias=.035;sun.shadow.bias=-.0002;this.scene.add(sun);
+    this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFShadowMap;this.renderer.outputColorSpace=THREE.SRGBColorSpace;this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=.9;
+    this.art=new WorldArt(this.renderer);this.scene.fog=new THREE.Fog('#d5cbb4',120,280);
+    const sky=new Sky();sky.scale.setScalar(350);const u=sky.material.uniforms;u.turbidity.value=5;u.rayleigh.value=1.4;u.mieCoefficient.value=.005;u.mieDirectionalG.value=.8;u.sunPosition.value.set(-35,42,28);this.scene.add(sky);
+    this.scene.add(new THREE.HemisphereLight('#c8ddf1','#8f7456',.7));const sun=new THREE.DirectionalLight('#ffe7c0',3.1);sun.position.set(-60,95,45);sun.castShadow=true;sun.shadow.mapSize.set(4096,4096);Object.assign(sun.shadow.camera,{left:-80,right:80,top:80,bottom:-80,near:1,far:230});sun.shadow.camera.updateProjectionMatrix();sun.shadow.normalBias=.035;sun.shadow.bias=-.0002;this.scene.add(sun);
     const pmrem=new THREE.PMREMGenerator(this.renderer);const environmentScene=new THREE.Scene();const environmentSky=sky.clone();environmentScene.add(environmentSky);const env=pmrem.fromScene(environmentScene,.04);this.scene.environment=env.texture;this.scene.environmentIntensity=.35;this.art.textures.push(env.texture);pmrem.dispose();
     this.camera.rotation.order='YXZ';this.scene.add(this.camera);this.gun.scale.setScalar(.75);this.gun.position.set(.26,-.28,-.56);this.camera.add(this.gun);this.gun.visible=false;
     this.flash=new THREE.Mesh(new THREE.ConeGeometry(.08,.24,6),new THREE.MeshBasicMaterial({color:'#fff1aa',transparent:true,opacity:.9}));this.flash.rotation.x=-Math.PI/2;this.flash.position.set(0,.035,-.7);this.flash.visible=false;this.gun.add(this.flash);this.setGun('rifle');
@@ -34,13 +37,14 @@ export class Arena {
     document.addEventListener('keydown',this.keydown);document.addEventListener('keyup',this.keyup);document.addEventListener('mousemove',this.mousemove);document.addEventListener('mousedown',this.mousedown);document.addEventListener('mouseup',this.mouseup);document.addEventListener('pointerlockchange',this.lockchange);window.addEventListener('blur',this.blur);
     this.raf=requestAnimationFrame(this.frame);void RAPIER.init().then(()=>{if(this.destroyed)return;this.physicsReady=true;this.resetPhysics();});
   }
+  preview(index:number|null){this.tourIndex=index;if(index!==null)this.setMap('dunes');}
   setMap(mapId:MapId){
     if(this.mapRoot&&this.mapId===mapId)return;this.mapId=mapId;this.mapRoot?.removeFromParent();let root=this.roots.get(mapId);if(!root){root=this.art.build(mapId);this.roots.set(mapId,root);}this.mapRoot=root;this.scene.add(root);
     for(const mesh of this.pickups.values())disposeGroup(mesh);this.pickups.clear();
-    for(const p of MAPS[mapId].pickups){const g=new THREE.Group(),gun=this.art.weapon(p.weapon,false);gun.scale.setScalar(.8);gun.rotation.z=Math.PI/2;g.add(gun);const ring=new THREE.Mesh(new THREE.TorusGeometry(.48,.018,6,32),new THREE.MeshBasicMaterial({color:'#e9b065'}));ring.rotation.x=Math.PI/2;ring.position.y=-.35;g.add(ring);g.position.set(p.x,.8,p.z);this.scene.add(g);this.pickups.set(p.id,g);}
+    for(const p of MAPS[mapId].pickups){const g=new THREE.Group(),gun=this.art.weapon(p.weapon,false);gun.scale.setScalar(.8);gun.rotation.z=Math.PI/2;g.add(gun);const ring=new THREE.Mesh(new THREE.TorusGeometry(.48,.018,6,32),new THREE.MeshBasicMaterial({color:'#e9b065'}));ring.rotation.x=Math.PI/2;ring.position.y=-.35;g.add(ring);g.position.set(p.x,p.y+.8,p.z);g.userData.floor=p.y;this.scene.add(g);this.pickups.set(p.id,g);}
     if(this.physicsReady)this.resetPhysics();
   }
-  private resetPhysics(){for(const p of this.particles){p.mesh.removeFromParent();p.mesh.geometry.dispose();}this.particles=[];this.world?.free();this.world=new RAPIER.World({x:0,y:-18,z:0});for(const b of MAPS[this.mapId].solids)this.world.createCollider(RAPIER.ColliderDesc.cuboid(b.w/2,b.h/2,b.d/2).setTranslation(b.x,b.y,b.z));this.world.createCollider(RAPIER.ColliderDesc.cuboid(90,.1,90).setTranslation(0,-.1,0));this.world.step();}
+  private resetPhysics(){for(const p of this.particles){p.mesh.removeFromParent();p.mesh.geometry.dispose();}this.particles=[];this.world?.free();this.world=new RAPIER.World({x:0,y:-18,z:0});for(const b of MAPS[this.mapId].solids){if(b.polygon||b.ramp){const geometry=solidGeometry(b);const positions=new Float32Array(geometry.attributes.position.array),indices=geometry.index?new Uint32Array(geometry.index.array):Uint32Array.from({length:positions.length/3},(_,i)=>i);this.world.createCollider(RAPIER.ColliderDesc.trimesh(positions,indices));geometry.dispose();}else this.world.createCollider(RAPIER.ColliderDesc.cuboid(b.w/2,b.h/2,b.d/2).setTranslation(b.x,b.y,b.z));}this.world.createCollider(RAPIER.ColliderDesc.cuboid(90,.1,90).setTranslation(0,-.1,0));this.world.step();}
   private setGun(kind:Equipment){if(this.gunModels.size&&this.gunKind===kind)return;this.gunKind=kind;for(const m of this.gunModels.values())m.visible=false;let m=this.gunModels.get(kind);if(!m){m=this.art.weapon(kind);this.gunModels.set(kind,m);this.gun.add(m);}m.visible=true;this.flash.position.z=kind==='pistol'?-.33:kind==='marksman'?-.97:-.71;}
   private resize(){const r=this.canvas.getBoundingClientRect();this.renderer.setSize(r.width,r.height,false);this.camera.aspect=r.width/r.height;this.camera.updateProjectionMatrix();}
   start(id:string){this.id=id;this.active=true;this.pending=[];this.seq=0;this.snap=undefined;this.snapshots=[];this.keys.clear();this.prompt='';}
@@ -109,8 +113,8 @@ export class Arena {
       for(const [id,g] of this.avatars)if(!this.snap.players.some(p=>p.id===id)){disposeGroup(g);this.avatars.delete(id);this.remoteStep.delete(id);}
       for(const g of this.snap.grenades){let mesh=this.grenadeMeshes.get(g.id);if(!mesh){mesh=new THREE.Group();const shell=new THREE.Mesh(new THREE.SphereGeometry(.13,10,8),this.art.dark);mesh.add(shell);this.art.box(mesh,.04,.1,.06,this.art.metal,0,.14,0);const glow=new THREE.Mesh(new THREE.SphereGeometry(.025,6,6),new THREE.MeshBasicMaterial({color:'#ff5639'}));glow.position.y=.18;mesh.add(glow);this.grenadeMeshes.set(g.id,mesh);this.scene.add(mesh);}mesh.position.lerp(new THREE.Vector3(g.x,g.y,g.z),Math.min(1,dt*25));mesh.rotation.z=now*.004;}
       for(const [id,g] of this.grenadeMeshes)if(!this.snap.grenades.some(p=>p.id===id)){disposeGroup(g);this.grenadeMeshes.delete(id);}
-    }else{const a=now*.000012;this.camera.position.set(38+Math.sin(a)*4,31,38+Math.cos(a)*3);this.camera.lookAt(-1,0,0);}
-    for(const p of this.pickups.values()){p.rotation.y=now*.0006;p.position.y=.85+Math.sin(now*.002)*.07;}
+    }else if(this.tourIndex!==null){const view=MAP_TOUR[this.tourIndex];this.camera.position.set(view.eye.x,view.eye.y,view.eye.z);this.camera.lookAt(view.target.x,view.target.y,view.target.z);}else{const a=now*.000012;if(this.mapId==='dunes'){this.camera.position.set(68+Math.sin(a)*4,65,78+Math.cos(a)*3);this.camera.lookAt(0,0,-5);}else{this.camera.position.set(38+Math.sin(a)*4,31,38+Math.cos(a)*3);this.camera.lookAt(-1,0,0);}}
+    for(const p of this.pickups.values()){p.rotation.y=now*.0006;p.position.y=(p.userData.floor??0)+.85+Math.sin(now*.002)*.07;}
     if(this.world){this.world.timestep=Math.max(1/120,Math.min(dt,1/30));this.world.step();for(const p of this.particles){const pos=p.body.translation();p.mesh.position.set(pos.x,pos.y,pos.z);p.mesh.quaternion.copy(p.body.rotation());}this.particles=this.particles.filter(p=>{if(now<p.until)return true;p.mesh.removeFromParent();p.mesh.geometry.dispose();this.world!.removeRigidBody(p.body);return false;});}
     this.traces=this.traces.filter(p=>{if(now<p.until){if(p.explosion){const k=(now-p.start)/700;p.object.scale.setScalar(1+k*10);const m=p.object.material as THREE.MeshBasicMaterial;m.opacity=(1-k)*.6;m.color.lerp(new THREE.Color('#6f6656'),.12);}return true;}p.object.removeFromParent();p.object.geometry.dispose();(p.object.material as THREE.Material).dispose();return false;});
     this.renderer.render(this.scene,this.camera);this.raf=requestAnimationFrame(this.frame);

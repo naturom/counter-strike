@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import {buildDust} from './dust-world';
 import {MAPS,type MapId,type Equipment} from '@sirocco/shared';
 export function disposeGroup(group:THREE.Object3D){group.traverse(o=>{if(o instanceof THREE.Mesh||o instanceof THREE.Line)o.geometry.dispose();});group.removeFromParent();}
 export class WorldArt {
@@ -20,6 +21,7 @@ export class WorldArt {
   cylinder(parent:THREE.Object3D,top:number,bottom:number,h:number,mat:THREE.Material,x:number,y:number,z:number){const mesh=new THREE.Mesh(new THREE.CylinderGeometry(top,bottom,h,12),mat);mesh.position.set(x,y,z);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;}
   sign(parent:THREE.Object3D,text:string,x:number,y:number,z:number,rotation=0,color='#3a615d',width=3.6){const c=document.createElement('canvas');c.width=512;c.height=128;const ctx=c.getContext('2d')!;ctx.fillStyle=color;ctx.fillRect(0,0,512,128);ctx.strokeStyle='#e5d7b7';ctx.lineWidth=3;ctx.strokeRect(9,9,494,110);ctx.fillStyle='#e9e2cb';ctx.font='bold 38px sans-serif';ctx.textAlign='center';ctx.fillText(text,256,79);const texture=new THREE.CanvasTexture(c);texture.colorSpace=THREE.SRGBColorSpace;this.textures.push(texture);const m=this.material('#ffffff',{map:texture});const mesh=new THREE.Mesh(new THREE.PlaneGeometry(width,.9),m);mesh.position.set(x,y,z);mesh.rotation.y=rotation;parent.add(mesh);}
   build(mapId:MapId){
+    if(mapId==='dunes')return this.batch(buildDust(this));
     const root=new THREE.Group(),map=MAPS[mapId];this.box(root,180,.2,180,this.sand,0,-.1,0,true);
     for(const b of map.solids){
       this.box(root,b.w,b.h,b.d,b.kind==='crate'?this.wood:this.stone,b.x,b.y,b.z,true);
@@ -56,9 +58,12 @@ export class WorldArt {
     for(const z of [-9,10]){const pts=[];for(let i=0;i<=24;i++){const t=i/24;pts.push(new THREE.Vector3(-26+t*52,7-Math.sin(t*Math.PI)*1.5,z));}const mat=new THREE.LineBasicMaterial({color:'#3c3933'});this.materials.push(mat);root.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),mat));}
     // Drain grates and worn ground markings provide visual scale at eye level.
     for(const [x,z] of [[0,6],[26,0],[-26,10]]){for(let i=0;i<8;i++)this.box(root,.6,.015,.025,this.metal,x,.012,z+i*.08);}
+    return this.batch(root);
+  }
+  private batch(root:THREE.Group){
     // Bake static scenery by material to keep detailed maps cheap to draw.
     root.updateMatrixWorld(true);const batches=new Map<THREE.Material,THREE.BufferGeometry[]>();const originals:THREE.Mesh[]=[];
-    root.traverse(o=>{if(o instanceof THREE.Mesh&&!Array.isArray(o.material)){const geometry=o.geometry.clone().applyMatrix4(o.matrixWorld);const list=batches.get(o.material)??[];list.push(geometry);batches.set(o.material,list);originals.push(o);}});
+    root.traverse(o=>{if(o instanceof THREE.Mesh&&!Array.isArray(o.material)){const geometry=(o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone()).applyMatrix4(o.matrixWorld);const list=batches.get(o.material)??[];list.push(geometry);batches.set(o.material,list);originals.push(o);}});
     for(const mesh of originals){mesh.removeFromParent();mesh.geometry.dispose();}
     for(const [material,geometries] of batches){const merged=mergeGeometries(geometries);for(const geometry of geometries)geometry.dispose();if(merged){const mesh=new THREE.Mesh(merged,material);mesh.castShadow=true;mesh.receiveShadow=true;root.add(mesh);}}
     return root;

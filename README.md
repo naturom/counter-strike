@@ -1,6 +1,6 @@
-# Counter Strike — Dunes & Relay
+# Counter Strike — Dust II & Relay
 
-An original desktop browser multiplayer FPS, implemented with Next.js, TypeScript, Three.js, Rapier and an authoritative Colyseus server. Choose between **Dunes** (default), an original desert map inspired by Dust II’s long lane, mid gates, courtyards and tunnel flank, and **Relay**, the original outpost. Layouts and models are original; no Valve game assets are included. PBR sandstone and sand textures are CC0 from Poly Haven; see [asset sources](ASSETS.md).
+An original desktop browser multiplayer FPS, implemented with Next.js, TypeScript, Three.js, Rapier and an authoritative Colyseus server. Choose between **Dust II** (default), a hand-authored reconstruction with Long, Mid, raised Short, CT passage, and upper/lower tunnels, and **Relay**, the original outpost. The Dust II proportions and elevations are approximate; its geometry and scenery are authored here, and no Valve game assets are included. Use **Scout the map** in the lobby to inspect eight viewpoints. PBR sandstone and sand textures are CC0 from Poly Haven; see [asset sources](ASSETS.md).
 
 ## Play
 

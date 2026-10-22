@@ -1,5 +1,17 @@
 # Verified deployment — 22 October 2026 (Singapore)
 
+## Current release: Dust II reconstruction
+
+- **Play:** https://desert-fps-479916246177.asia-southeast1.run.app
+- **Ready revision:** `desert-fps-00005-w5s`, serving 100% of traffic.
+- **Cloud Build:** `79b29f1e-725d-443a-9236-58099629234a`, status `SUCCESS` ([build record](https://console.cloud.google.com/cloud-build/builds/79b29f1e-725d-443a-9236-58099629234a?project=479916246177)).
+- Image: `asia-southeast1-docker.pkg.dev/nood-429501/desert-fps/game:20261022-dust2-01`.
+- Immutable digest: `sha256:e3909ec03bc2c43670b5bc7a13ad32b7534cbbe044bc879b63da4ac5817b6244`.
+
+This release adds the hand-authored Dust II routes and scenery, raised Short/CT passage, map preview, and teammate radar. Cloud Build reran typecheck, the 37-test suite, and the production build. The public `/health` endpoint returned `{"ok":true,"service":"desert-fps","rooms":0,"version":"2.0.0"}`. Browser verification confirmed the live map preview, room creation with Dust II, and that leaving a room clears the invitation URL and unlocks both map choices. The service continues to use its existing resource limits, runtime account and signing secret.
+
+The sections below document the preceding release and operating settings.
+
 ## Release
 
 - **Play:** https://desert-fps-479916246177.asia-southeast1.run.app

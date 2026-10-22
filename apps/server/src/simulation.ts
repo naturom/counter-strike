@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {DT,RADIUS,ROUND_MS,WIN_SCORE,MAPS,DEFAULT_MAP,WEAPONS,KNIFE,isGun,direction,move,neutralInput,rayBox,wallDistance,heightOf,eyeOf,nearestPickup,type Input,type Player,type Snapshot,type CombatEvent,type Solid,type Team,type MapId,type Pickup,type Grenade,type Equipment,type Vec3} from '@sirocco/shared';
+import {DT,RADIUS,intersects,ROUND_MS,WIN_SCORE,MAPS,DEFAULT_MAP,WEAPONS,KNIFE,isGun,direction,move,neutralInput,rayBox,wallDistance,heightOf,eyeOf,nearestPickup,type Input,type Player,type Snapshot,type CombatEvent,type Solid,type Team,type MapId,type Pickup,type Grenade,type Equipment,type Vec3} from '@sirocco/shared';
 const freshAmmo=()=>({rifle:30,pistol:12,smg:0,marksman:0});
 export class Simulation {
   players=new Map<string,Player>();
@@ -15,7 +15,7 @@ export class Simulation {
   round=1;readonly matchId=randomUUID();
   readonly mapId:MapId;
   solids:Solid[];pickups:Pickup[];grenades:Grenade[]=[];
-  constructor(mapOrSolids:MapId|Solid[]=DEFAULT_MAP){this.mapId=typeof mapOrSolids==='string'?mapOrSolids:DEFAULT_MAP;this.solids=typeof mapOrSolids==='string'?MAPS[mapOrSolids].solids:mapOrSolids;this.pickups=MAPS[this.mapId].pickups.map(p=>({...p}));}
+  constructor(mapOrSolids:MapId|Solid[]=DEFAULT_MAP){this.mapId=typeof mapOrSolids==='string'?mapOrSolids:'relay';this.solids=typeof mapOrSolids==='string'?MAPS[mapOrSolids].solids:mapOrSolids;this.pickups=MAPS[this.mapId].pickups.map(p=>({...p}));}
   add(id:string,name:string):Player {
     if(this.players.size>=8)throw new Error('Room full (8/8).');
     const red=[...this.players.values()].filter(p=>p.team==='red').length,blue=this.players.size-red;
@@ -104,8 +104,9 @@ export class Simulation {
       for(let step=0;step<2;step++){
         g.vy-=16*DT/2;
         for(const [axis,v] of [['x','vx'],['y','vy'],['z','vz']] as const){
-          const delta=g[v]*DT/2;g[axis]+=delta;
-          for(const b of this.solids){const r=.12;if(g.x+r>b.x-b.w/2&&g.x-r<b.x+b.w/2&&g.y+r>b.y-b.h/2&&g.y-r<b.y+b.h/2&&g.z+r>b.z-b.d/2&&g.z-r<b.z+b.d/2){const half=(axis==='x'?b.w:axis==='y'?b.h:b.d)/2;g[axis]=b[axis]+(delta>0?-half-r:half+r);g[v]*=-.48;}}
+          const delta=g[v]*DT/2,before=g[axis];g[axis]+=delta;
+          const blocked=()=>this.solids.some(b=>intersects({x:g.x,y:g.y-.12,z:g.z},b,.24,.12));
+          if(blocked()){let lo=0,hi=1;for(let n=0;n<9;n++){const t=(lo+hi)/2;g[axis]=before+delta*t;if(blocked())hi=t;else lo=t;}g[axis]=before+delta*lo;g[v]*=-.48;}
         }
         if(g.y<.12){g.y=.12;g.vy=Math.abs(g.vy)*.42;g.vx*=.8;g.vz*=.8;if(g.vy<.4)g.vy=0;}
       }
