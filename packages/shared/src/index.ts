@@ -117,8 +117,13 @@ export function move(p:Motion,i:Input,solids:Solid[]=SOLIDS):Motion {
   }
   if(out.y<=landing){out.y=landing;out.vy=0;out.grounded=true;}
   if(out.y>ceiling){out.y=ceiling;out.vy=0;}
-  // Keep feet on descending ramps without oscillating between grounded/airborne.
-  if(p.grounded&&!i.jump&&out.vy<=0){const floor=groundAt(out,solids,oldY+.001);if(out.y-floor>=0&&out.y-floor<.36){out.y=floor;out.vy=0;out.grounded=true;}}
+  // Use the same foot radius as collision when following descending surfaces.
+  // A centre-only floor lookup could pull feet back into a landing/ledge that
+  // still overlaps the player's body, causing repeated step-up/snap-down jitter.
+  if(p.grounded&&!i.jump&&out.vy<=0){
+    let floor=0;for(const b of solids)if(footprint(out,b)){const top=solidTop(b,out);if(top<=oldY+.001)floor=Math.max(floor,top);}
+    if(out.y-floor>=0&&out.y-floor<.36){out.y=floor;out.vy=0;out.grounded=true;}
+  }
   return out;
 }
 export function rayBox(origin:Vec3,dir:Vec3,min:Vec3,max:Vec3):number|null {

@@ -62,10 +62,10 @@ export class WorldArt {
   }
   private batch(root:THREE.Group){
     // Bake static scenery by material to keep detailed maps cheap to draw.
-    root.updateMatrixWorld(true);const batches=new Map<THREE.Material,THREE.BufferGeometry[]>();const originals:THREE.Mesh[]=[];
-    root.traverse(o=>{if(o instanceof THREE.Mesh&&!Array.isArray(o.material)){const geometry=(o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone()).applyMatrix4(o.matrixWorld);const list=batches.get(o.material)??[];list.push(geometry);batches.set(o.material,list);originals.push(o);}});
+    root.updateMatrixWorld(true);const batches=new Map<string,{material:THREE.Material;cast:boolean;receive:boolean;geometries:THREE.BufferGeometry[]}>();const originals:THREE.Mesh[]=[];
+    root.traverse(o=>{if(o instanceof THREE.Mesh&&!Array.isArray(o.material)){const geometry=(o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone()).applyMatrix4(o.matrixWorld);const key=`${o.material.uuid}:${o.castShadow}:${o.receiveShadow}`;const batch=batches.get(key)??{material:o.material,cast:o.castShadow,receive:o.receiveShadow,geometries:[] as THREE.BufferGeometry[]};batch.geometries.push(geometry);batches.set(key,batch);originals.push(o);}});
     for(const mesh of originals){mesh.removeFromParent();mesh.geometry.dispose();}
-    for(const [material,geometries] of batches){const merged=mergeGeometries(geometries);for(const geometry of geometries)geometry.dispose();if(merged){const mesh=new THREE.Mesh(merged,material);mesh.castShadow=true;mesh.receiveShadow=true;root.add(mesh);}}
+    for(const {material,cast,receive,geometries} of batches.values()){const merged=mergeGeometries(geometries);for(const geometry of geometries)geometry.dispose();if(merged){const mesh=new THREE.Mesh(merged,material);mesh.castShadow=cast;mesh.receiveShadow=receive;root.add(mesh);}}
     return root;
   }
   private palm(root:THREE.Group,x:number,z:number){const trunk=this.wood,leaf=this.material('#64704b',{side:THREE.DoubleSide});this.cylinder(root,.15,.28,6.7,trunk,x,3.35,z);for(let i=0;i<9;i++){const g=new THREE.Group();g.position.set(x,6.5,z);g.rotation.y=i*Math.PI*2/9;for(let j=0;j<8;j++){const mesh=new THREE.Mesh(new THREE.PlaneGeometry(.7-j*.06,.75),leaf);mesh.position.set(0,-j*j*.022,-j*.38);mesh.rotation.x=-Math.PI/2-j*.07;mesh.rotation.z=(j%2?.12:-.12);g.add(mesh);}root.add(g);}}

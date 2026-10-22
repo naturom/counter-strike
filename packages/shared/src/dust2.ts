@@ -31,7 +31,7 @@ boundary.forEach((p,i)=>wall('Perimeter',p,boundary[(i+1)%boundary.length],8+(i%
 
 // Large building footprints establish every route and the characteristic bends.
 poly('Northern kasbah',[[263,80],[790,80],[790,104],[618,104],[618,155],[574,155],[574,213],[488,213],[488,150],[320,150],[320,118],[263,118]],9,0,'kasbah');
-poly('B northern parapet',[[136,80],[218,80],[254,102],[254,118],[136,118]],7,2,'kasbah');
+poly('B northern parapet',[[136,80],[263,80],[263,118],[136,118]],7,2,'kasbah');
 rect('B east wall north',254,118,9,71,6,2,'wall','kasbah');
 rect('B window sill',254,189,9,25,1.25,2,'wall','kasbah');
 rect('B window lintel',254,189,9,25,2.6,5.1,'wall','kasbah');
@@ -55,39 +55,50 @@ rect('T spawn west retaining',153,766,8,115,4.1,0,'wall','kasbah');
 
 // Authored elevations: A and Short over CT, the depressed pit, two tunnel levels,
 // T ramp and sloping mid. These volumes are shared by rendering and authority.
+// A visible, collidable base replaces the old invisible Y=0 fallback in gaps.
+floor('Foundation',0,0,1024,1024,0);
 floor('T spawn terrace',54,882,434,95,3.2,'stone');
 floor('T terrace west',161,773,183,109,3.2,'stone');
-ramp('T west stairs',90,770,63,112,'z',1.6,3.2);
+ramp('T west stairs',54,770,99,112,'z',1.6,3.2);
 floor('Outside tunnels',90,610,154,160,1.6);
-ramp('Tunnel approach',170,500,74,110,'z',3.2,1.6);
-floor('Upper tunnels',66,414,234,88,3.2);
+floor('Tunnel west apron',90,576,80,34,1.6);
+ramp('Tunnel approach',170,500,130,110,'z',3.2,1.6);
+floor('Upper tunnels',66,414,220,88,3.2);
 floor('B tunnel',98,327,40,87,3.2);
 ramp('B tunnel exit',98,285,40,42,'z',2,3.2);
 floor('B site courtyard',66,180,188,147,2);
 floor('B site north',78,16,58,164,2);
 floor('B plant platform',136,118,118,62,2.65);
 ramp('B platform ramp',136,180,45,32,'z',2.65,2);
-floor('B site east edge',170,327,40,43,2);
+floor('B exit apron',170,327,116,43,2);
+ramp('B exit return',170,370,116,44,'z',2,3.2);
 ramp('B doors threshold',254,232,65,36,'x',2,0);
 // The narrow lower tunnel flight drops toward Mid; the corridor stays under roof.
-ramp('Tunnel stairs',286,438,44,64,'z',.3,3.2);
+ramp('Tunnel stairs',286,438,44,56,'z',.3,3.2);
+floor('Tunnel stair landing',286,494,44,8,3.2);
 floor('Lower tunnels',286,386,160,52,.3);
 ramp('Lower tunnel exit',420,386,26,52,'x',.3,0);
 floor('CT Mid',263,118,355,167,0);
-floor('CT spawn',574,155,104,120,0);
-floor('CT underpass',678,214,164,59,0);
+floor('CT spawn',618,155,60,120,0);
+floor('CT underpass',678,214,120,59,0);
 floor('Mid bottom',428,285,104,153,0);
-ramp('Mid slope',439,438,93,182,'z',0,2.1);
+ramp('Mid slope',394,438,118,182,'z',0,2.1);
 floor('Top Mid',394,620,280,50,2.1);
-ramp('T east ramp',590,670,148,212,'z',2.1,3.2);
+floor('Top Mid east apron',532,610,16,10,2.1);
+ramp('T east ramp',394,670,280,212,'z',2.1,3.2);
 floor('T east passage',488,882,178,118,3.2);
-floor('Outside Long',674,676,64,146,2.1,'road');
-floor('Long vestibule',682,553,56,123,2.1,'tile');
-floor('Long corner',690,456,235,97,2.1,'road');
+floor('Outside Long',674,670,64,152,2.1,'road');
+floor('Long vestibule',674,553,64,123,2.1,'tile');
+floor('Long corner',674,456,251,64,2.1,'road');
+floor('Long corner apron',690,520,160,33,2.1,'road');
+floor('Long west pavement',738,553,112,137,2.1,'road');
+floor('Long east pavement',925,496,40,63,2.1,'road');
 floor('Long lane',842,318,83,138,2.1,'road');
 floor('Long cross',842,215,128,103,2.1,'road');
+floor('Long bevel pavement',925,318,22,37,2.1,'road');
 floor('Long side pit',925,559,40,109,2.1);
-floor('Pit',850,559,75,139,.45,'tile');
+floor('Pit',850,559,75,231,.45,'tile');
+floor('Pit rear apron',846,690,4,100,.45,'tile');
 ramp('Pit stairs',850,520,75,39,'z',2.1,.45);
 ramp('A ramp',842,150,90,65,'z',3.8,2.1,'road');
 floor('A site',678,80,164,134,3.8,'tile');
@@ -95,15 +106,18 @@ floor('Goose',790,34,135,116,3.8,'tile');
 floor('A long platform',842,104,90,46,3.8,'road');
 ramp('CT exit ramp',798,214,44,59,'x',0,2.1);
 // Short is a real bridge above the CT approach; no solid column through the passage.
-floor('Catwalk approach',512,436,20,184,1.7,'tile');
+floor('Catwalk approach',512,436,20,154,1.7,'tile');
+ramp('Catwalk entry',512,590,20,30,'z',1.7,2.1,'tile');
 floor('Catwalk',515,386,163,50,1.7,'tile');
+floor('Catwalk recess',576,372,42,14,1.7,'tile');
 rect('Mid catwalk retaining',503,395,9,164,2.7,0,'wall','plaster');
 ramp('Short stairs',618,334,60,52,'z',3.8,1.7,'tile');
 floor('Short bend',618,273,60,61,3.8,'tile');
-floor('Short bridge',618,155,60,118,3.8,'tile',3.35);
+floor('Short bridge',618,104,60,169,3.8,'tile',3.35);
 rect('Short parapet west',615,273,4,61,1,3.8,'wall','plaster');
 rect('Short parapet west bridge',615,155,4,118,1,3.8,'wall','plaster');
-rect('A retaining face',678,210,120,4,3.8,0,'wall','plaster');
+// The A floor volume supplies its retaining face; an overlapping wall here
+// previously duplicated the top surface and caused depth flicker.
 // Modern solo climb from CT to A, built as broad steps rather than a sealed wall.
 crate('CT boost low',686,221,21,18,.9,0);crate('CT boost middle',707,221,21,18,1.8,0);crate('CT boost high',728,221,21,18,2.7,0);
 

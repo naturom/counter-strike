@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {DUST2,dustPoint,DUST_SCALE} from '@sirocco/shared';
 import {solidTop,type Solid} from '@sirocco/shared';
 import type {WorldArt} from './world';
-import {solidGeometry} from './map-geometry';
+import {solidGeometry,visibleFloorGeometry} from './map-geometry';
 
 export function buildDust(art:WorldArt){
   const root=new THREE.Group();root.name='Dust II';
@@ -17,10 +17,11 @@ export function buildDust(art:WorldArt){
   const box=(w:number,h:number,d:number,m:THREE.Material,x:number,y:number,z:number)=>art.box(root,w,h,d,m,x,y,z);
   const material=(b:Solid)=>b.style==='door'?art.wood:b.style==='road'?road:b.style==='tile'?paving:b.style==='metal'?blue:b.kind==='crate'?art.wood:b.style==='kasbah'?(b.x<-20?clay:ochre):b.style==='plaster'?(b.z>5?chalk:plaster):art.stone;
   art.box(root,230,.25,230,art.sand,0,-.43,0,true);
+  const floors=DUST2.solids.filter(b=>b.kind==='floor');
   for(const b of DUST2.solids){
     // Vehicles have individually modelled bodies matching these collision bounds.
     if(['Long car','B car','CT truck'].includes(b.label??''))continue;
-    const mesh=new THREE.Mesh(solidGeometry(b),material(b));mesh.castShadow=b.kind!=='floor';mesh.receiveShadow=true;root.add(mesh);
+    const mesh=new THREE.Mesh(b.kind==='floor'?visibleFloorGeometry(b,floors):solidGeometry(b),material(b));mesh.castShadow=b.kind!=='floor';mesh.receiveShadow=true;root.add(mesh);
     if(b.kind==='crate'&&b.style!=='metal'){
       for(const y of [b.y-b.h/2+.12,b.y+b.h/2-.12])box(b.w+.035,.11,b.d+.035,iron,b.x,y,b.z);
       for(const x of [-b.w/2+.13,b.w/2-.13])box(.1,b.h,b.d+.045,iron,b.x+x,b.y,b.z);
