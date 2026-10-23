@@ -12,11 +12,13 @@ export default function Game(){
   const [selectedMode,setSelectedMode]=useState<GameMode>('defusal');
   const [resultReady,setResultReady]=useState(true);const resultTimer=useRef<ReturnType<typeof setTimeout>|null>(null);const lastResult=useRef('');
   const [preview,setPreview]=useState<number|null>(null);
+  const [screen,setScreen]=useState<'room'|'profile'>('room');
+  const [createdHere,setCreatedHere]=useState(false);
   function scout(index:number|null){setPreview(index);arena.current?.preview(index);}
   const [ready,setReady]=useState(false),[name,setName]=useState(''),[invite,setInvite]=useState(''),[status,setStatus]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[playing,setPlaying]=useState(false),[locked,setLocked]=useState(false),[board,setBoard]=useState(false),[snap,setSnap]=useState<Snapshot|null>(null),[feed,setFeed]=useState<(CombatEvent&{at:number})[]>([]),[copied,setCopied]=useState(false),[hit,setHit]=useState(false),[sound,setSound]=useState(true),[votes,setVotes]=useState(''),[notice,setNotice]=useState('');
   const [selectedMap,setSelectedMap]=useState<MapId>(DEFAULT_MAP),[pickup,setPickup]=useState(''),[hurt,setHurt]=useState(false),[damageAngle,setDamageAngle]=useState(0);const hurtTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   useEffect(()=>{
-    setName(localStorage.getItem('sirocco-name')??'');const token=new URLSearchParams(location.hash.slice(1)).get('invite')??'';setInvite(token);inviteRef.current=token;
+    setName(localStorage.getItem('sirocco-name')??'');const token=new URLSearchParams(location.hash.slice(1)).get('invite')??'';setInvite(token);inviteRef.current=token;if(token)setScreen('profile');
     client.current=new Client(`${location.protocol==='https:'?'wss':'ws'}://${location.host}`);
     try{arena.current=new Arena(canvas.current!,{input:i=>room.current?.send('input',i),lock:setLocked,board:setBoard,pickup:setPickup,damage:angle=>{setDamageAngle(angle);setHurt(true);if(hurtTimer.current)clearTimeout(hurtTimer.current);hurtTimer.current=setTimeout(()=>setHurt(false),350);}});if(token){try{const payload=JSON.parse(atob(token.split('.')[0].replace(/-/g,'+').replace(/_/g,'/')));const mapId=validMap(payload.mapId)?payload.mapId:'relay';setSelectedMap(mapId);setSelectedMode(payload.mode==='defusal'?'defusal':'deathmatch');arena.current.setMap(mapId);}catch{}}setReady(true);}catch{setError('WebGL is unavailable. Use a desktop browser with hardware acceleration enabled.');}
     return()=>{if(resultTimer.current)clearTimeout(resultTimer.current);if(hurtTimer.current)clearTimeout(hurtTimer.current);intentional.current=true;void room.current?.leave();arena.current?.destroy();};
@@ -32,6 +34,15 @@ export default function Game(){
       if(code===4000){setStatus('Disconnected after two minutes without activity.');setPlaying(false);arena.current?.stop();sessionStorage.removeItem('sirocco-reconnect');return;}
       void reconnect(next.reconnectionToken);
     });
+  }
+  async function createRoom(){
+    if(busy)return;setBusy(true);setError('');setStatus('Creating room · a cold start may take a moment…');
+    try{
+      const response=await fetch('/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'create',mapId:selectedMap,mode:selectedMode}),signal:AbortSignal.timeout(45000)});
+      const data=await response.json();if(!response.ok)throw new Error(data.error??'Could not create room');
+      inviteRef.current=data.invite;setInvite(data.invite);history.replaceState(null,'',`/#invite=${data.invite}`);
+      setCreatedHere(true);setScreen('profile');setStatus('');
+    }catch(e){setError((e as Error).message);setStatus('');}finally{setBusy(false);}
   }
   async function reserve(token:string){
     const response=await fetch('/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nickname:nameRef.current,invite:token||undefined,mapId:selectedMap,mode:selectedMode}),signal:AbortSignal.timeout(45000)});
@@ -63,10 +74,10 @@ export default function Game(){
     intentional.current=true;const previous=room.current;room.current=null;void previous?.leave();arena.current?.stop();
     inviteRef.current='';setInvite('');history.replaceState(null,'','/');sessionStorage.removeItem('sirocco-reconnect');
     if(resultTimer.current)clearTimeout(resultTimer.current);lastResult.current='';setResultReady(true);
-    setPlaying(false);setSnap(null);setBoard(false);setPickup('');setHurt(false);setStatus('');setError('');setNotice('');setFeed([]);setVotes('');setCopied(false);
+    setCreatedHere(false);setScreen('room');setPlaying(false);setSnap(null);setBoard(false);setPickup('');setHurt(false);setStatus('');setError('');setNotice('');setFeed([]);setVotes('');setCopied(false);
   }
   const armed=snap?.bombs.filter(b=>b.status==='planted')??[];const fuse=armed.length?Math.min(...armed.map(b=>b.explodeAt)):null;
-  const me=snap?.players.find(p=>p.id===room.current?.sessionId);const remaining=snap?Math.max(0,Math.ceil(((fuse??snap.endsAt)-snap.time)/1000)):600;const time=`${String(Math.floor(remaining/60)).padStart(2,'0')}:${String(remaining%60).padStart(2,'0')}`;
+  const me=snap?.players.find(p=>p.id===room.current?.sessionId);const remaining=snap?Math.max(0,Math.ceil(((fuse??snap.endsAt)-snap.time)/1000)):600;const time=(snap?.mode??selectedMode)==='defusal'&&fuse===null?'∞':`${String(Math.floor(remaining/60)).padStart(2,'0')}:${String(remaining%60).padStart(2,'0')}`;
   const map=MAPS[snap?.mapId??selectedMap];const defusal=(snap?.mode??selectedMode)==='defusal';
   return <main className={playing?'app in-game':'app'}>
     <canvas ref={canvas} className="arena" aria-label={`${map.name} desert arena`} />
@@ -74,17 +85,32 @@ export default function Game(){
       <div className="lobby-shade"/>
       <header className="topbar"><a className="brand" href="/" aria-label="Counter Strike home"><span className="brand-mark">╱╱</span> COUNTER STRIKE<span className="brand-sub">MULTIPLAYER FPS</span></a><div className="top-meta"><span className="dot"/> ASIA / SINGAPORE <span className="build">BUILD 03</span></div></header>
       <section className="lobby">
-        <div className="intro"><div className="eyebrow"><span className="tiny-line"/> DESERT OPERATIONS / 01</div><h1>Hold your ground.<br/><em>Own the dust.</em></h1><div className="mode-tags"><span>4 VS 4</span><span>{defusal?'BOMB DEFUSAL':'TEAM DEATHMATCH'}</span><span>NO DOWNLOAD</span></div>
-          <form className="join-card" onSubmit={e=>{e.preventDefault();void join();}}><div className="card-heading"><span>{invite?'INVITATION RECEIVED':'READY TO DEPLOY?'}</span><span className="card-number">01 — 08</span></div><fieldset className="map-select" disabled={!!invite||busy}><legend>CHOOSE YOUR MAP</legend><div>{Object.values(MAPS).map(m=><button type="button" key={m.id} aria-pressed={selectedMap===m.id} onClick={()=>{setSelectedMap(m.id);if(m.id==='relay')setSelectedMode('deathmatch');arena.current?.setMap(m.id);}}><strong>{m.name}</strong><small>{m.subtitle}</small></button>)}</div></fieldset>{selectedMap==='dunes'&&<fieldset className="mode-select" disabled={!!invite||busy}><legend>GAME MODE</legend><button type="button" aria-pressed={selectedMode==='defusal'} onClick={()=>setSelectedMode('defusal')}>BOMB DEFUSAL</button><button type="button" aria-pressed={selectedMode==='deathmatch'} onClick={()=>setSelectedMode('deathmatch')}>DEATHMATCH</button></fieldset>}<label htmlFor="callsign">YOUR CALLSIGN</label><div className="entry"><span className="input-icon">⌁</span><input id="callsign" maxLength={20} placeholder="Enter a guest nickname" value={name} onChange={e=>setName(e.target.value)} autoComplete="nickname" disabled={busy}/></div><button className="primary" type="submit" disabled={!ready||busy}>{busy?'CONNECTING…':invite?'JOIN THE ROOM':'CREATE A ROOM'}</button><div className="card-foot"><span className="dot"/> {invite?'Your team is assigned automatically.':'Private by invitation. No account needed.'}</div>{invite&&<button type="button" className="text-button" onClick={()=>{setInvite('');inviteRef.current='';setSelectedMap(DEFAULT_MAP);arena.current?.setMap(DEFAULT_MAP);history.replaceState(null,'','/');}}>Create a separate room instead</button>}</form>
+        <div className="intro"><div className="eyebrow"><span className="tiny-line"/> {screen==='profile'?'OPERATOR PROFILE / 02':'DESERT OPERATIONS / 01'}</div><h1>{screen==='profile'?<>Make your<br/><em>name count.</em></>:<>Hold your ground.<br/><em>Own the dust.</em></>}</h1><div className="mode-tags"><span>4 VS 4</span><span>{defusal?'BOMB DEFUSAL':'TEAM DEATHMATCH'}</span><span>NO DOWNLOAD</span></div>
+          {screen==='room'?<form className="join-card" onSubmit={e=>{e.preventDefault();void createRoom();}}>
+            <div className="card-heading"><span>CREATE YOUR ROOM</span></div>
+            <fieldset className="map-select" disabled={busy}><legend>CHOOSE YOUR MAP</legend><div>{Object.values(MAPS).map(m=><button type="button" key={m.id} aria-pressed={selectedMap===m.id} onClick={()=>{setSelectedMap(m.id);if(m.id==='relay')setSelectedMode('deathmatch');arena.current?.setMap(m.id);}}><strong>{m.name}</strong><small>{m.subtitle}</small></button>)}</div></fieldset>
+            {selectedMap==='dunes'&&<fieldset className="mode-select" disabled={busy}><legend>GAME MODE</legend><button type="button" aria-pressed={selectedMode==='defusal'} onClick={()=>setSelectedMode('defusal')}>BOMB DEFUSAL</button><button type="button" aria-pressed={selectedMode==='deathmatch'} onClick={()=>setSelectedMode('deathmatch')}>DEATHMATCH</button></fieldset>}
+            <button className="primary" type="submit" disabled={!ready||busy}>{busy?'CREATING…':'CREATE A ROOM'} <span>↗</span></button>
+          </form>:<form className="join-card profile-card" onSubmit={e=>{e.preventDefault();void join();}}>
+            <div className="card-heading"><span>{createdHere?'ROOM CREATED':'INVITATION RECEIVED'}</span></div>
+            <h2>Customize your profile.</h2><p className="profile-description">Choose the callsign your squad will see in the arena.</p>
+            <div className="profile-room"><span>{map.name}</span><span>{defusal?'BOMB DEFUSAL':'TEAM DEATHMATCH'}</span></div>
+            <label htmlFor="callsign">YOUR CALLSIGN</label><div className="entry"><span className="input-icon">⌁</span><input key="profile-callsign" id="callsign" maxLength={20} placeholder="Enter a guest nickname" value={name} onChange={e=>setName(e.target.value)} autoComplete="nickname" autoFocus required disabled={busy}/></div>
+            <button className="primary" type="submit" disabled={!ready||busy||!name.trim()}>{busy?'CONNECTING…':createdHere?'ENTER THE ROOM':'JOIN THE ROOM'}<span>↗</span></button>
+            <div className="card-foot"><span className="dot"/> Your team is assigned automatically.</div>
+            <button type="button" className="secondary" onClick={share}>{copied?'COPIED ✓':'COPY INVITATION LINK'}</button>
+            {notice&&<p className="profile-description" role="status">{notice}</p>}
+            {createdHere&&<button type="button" className="text-button" disabled={busy} onClick={()=>{setInvite('');inviteRef.current='';history.replaceState(null,'','/');setCreatedHere(false);setScreen('room');setCopied(false);setNotice('');setError('');setStatus('');}}>← BACK TO ROOM SETTINGS</button>}
+          </form>}
           {(error||status)&&<p className={error?'message error':'message'} role="status">{error||status}</p>}
         </div>
-        <aside className="map-label"><span className="map-kicker">{map.subtitle.toUpperCase()}</span><h2>{map.name.toUpperCase()}</h2><p>{map.description}</p><div className="map-stats"><div><b>{defusal?'C4':'30'}</b><span>{defusal?'PLANT / DEFUSE':'KILLS TO WIN'}</span></div><div><b>{defusal?'1':'10'}<span>{defusal?':55':':00'}</span></b><span>ROUND TIME</span></div></div>{selectedMap==='dunes'&&<button className="scout-map" onClick={()=>scout(0)}>SCOUT THE MAP</button>}</aside>
+        <aside className="map-label"><span className="map-kicker">{map.subtitle.toUpperCase()}</span><h2>{map.name.toUpperCase()}</h2><p>{map.description}</p><div className="map-stats"><div><b>{defusal?'C4':'30'}</b><span>{defusal?'PLANT / DEFUSE':'KILLS TO WIN'}</span></div><div><b>{defusal?'∞':<>10<span>:00</span></>}</b><span>ROUND TIME</span></div></div>{selectedMap==='dunes'&&<button className="scout-map" onClick={()=>scout(0)}>SCOUT THE MAP</button>}</aside>
       </section>
       <footer className="lobby-footer"><span>BUILT FOR THE BROWSER. MADE FOR THE SQUAD.</span><span><a href="/audio/CREDITS.txt" target="_blank" rel="noreferrer">AUDIO CREDITS</a> · DESKTOP + MOUSE</span></footer>
     </>:<>
       <div className={`damage-vignette ${hurt?'impact':''} ${me&&me.hp>0&&me.hp<=30?'critical':''}`} aria-hidden="true"/>
       {hurt&&<div className="damage-direction" style={{transform:`translate(-50%,-50%) rotate(${damageAngle}rad)`}} aria-hidden="true"><span/></div>}
-      <div className="match-top"><div className="match-brand">╱╱ COUNTER STRIKE <span>{map.name.toUpperCase()} / {defusal?'BOMB DEFUSAL':'TDM'}</span></div><div className="score-strip"><div className="team-red">RED <b>{snap?.scores.red??0}</b></div><div className="clock"><b>{time}</b><span>{defusal?(armed.length>0?'C4 FUSE':'ONE LIFE'):'FIRST TO 30'}</span></div><div className="team-blue"><b>{snap?.scores.blue??0}</b> BLUE</div></div><button className="share" onClick={share}>{copied?'LINK COPIED ✓':'INVITE A FRIEND ↗'}</button></div>
+      <div className="match-top"><div className="match-brand">╱╱ COUNTER STRIKE <span>{map.name.toUpperCase()} / {defusal?'BOMB DEFUSAL':'TDM'}</span></div><div className="score-strip"><div className="team-red">RED <b>{snap?.scores.red??0}</b></div><div className="clock"><b>{time}</b><span>{defusal?(armed.length>0?'C4 FUSE':'NO TIME LIMIT'):'FIRST TO 30'}</span></div><div className="team-blue"><b>{snap?.scores.blue??0}</b> BLUE</div></div><button className="share" onClick={share}>{copied?'LINK COPIED ✓':'INVITE A FRIEND ↗'}</button></div>
       {snap&&me&&<><Minimap snapshot={snap} me={me} room={busy?null:room.current}/>{defusal&&<BombHud snapshot={snap} me={me}/>}</>}
       <div className="killfeed">{feed.filter(e=>Date.now()-e.at<6000).map(e=><div key={e.id}><b className={`team-${e.team}`}>{e.name}</b><span>{weaponLabel(e.weapon)} ⌁</span>{e.victim}</div>)}</div>
       {locked&&me?.hp!==0&&<div className={hit?'crosshair hit':'crosshair'}><i/><i/><i/><i/></div>}

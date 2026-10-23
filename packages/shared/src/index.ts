@@ -7,7 +7,7 @@ export const KNIFE = {damage:40,range:1.8,interval:500} as const;
 export const isGun = (weapon:Equipment):weapon is Weapon => weapon!=='knife'&&weapon!=='grenade'&&weapon!=='bomb';
 export type GameMode='deathmatch'|'defusal';
 export const validMode=(value:unknown):value is GameMode=>value==='deathmatch'||value==='defusal';
-export const BOMB_RULES={plantMs:3200,fuseMs:40000,defuseMs:10000,roundMs:115000,range:2.2} as const;
+export const BOMB_RULES={plantMs:3200,fuseMs:40000,defuseMs:10000,range:2.2} as const;
 export interface BombSite {id:'A'|'B';x:number;z:number;w:number;d:number;minY:number;maxY:number;marker:Vec3&{size:number};}
 export const BOMB_TARGET:Record<Team,'A'|'B'>={red:'A',blue:'B'};
 export interface BombState extends Vec3 {team:Team;status:'carried'|'dropped'|'planted'|'defused'|'exploded';carrierId:string|null;siteId:'A'|'B'|null;explodeAt:number;action:{kind:'plant'|'defuse';playerId:string;startedAt:number;completeAt:number}|null;}

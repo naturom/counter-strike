@@ -13,8 +13,11 @@ export class ArenaRoom extends Room {
   private budgets=new Map<string,{start:number;count:number}>();
   private idle=new Map<string,number>();
   private votes=new Set<string>();
-  onCreate(options:{invite:string}) {
+  private profileExpiry?:{clear():void};
+  onCreate(options:{invite:string;awaitProfile?:boolean}) {
     const invitation=inviteSigner.verify(options.invite);this.inviteId=invitation.id;this.sim=new Simulation(invitation.mapId!,invitation.mode);
+    // A newly created room has no player until someone submits their profile.
+    if(options.awaitProfile){this.autoDispose=false;this.profileExpiry=this.clock.setTimeout(()=>{void this.disconnect();},10*60*1000);}
     this.maxClients=8;
     this.seatReservationTimeout=20;
     this.setPatchRate(null);
@@ -47,6 +50,7 @@ export class ArenaRoom extends Room {
     return {name:options.nickname.trim().replace(/[\x00-\x1f\x7f]/g,'')||'Guest'};
   }
   onJoin(client:Client,_options:unknown,auth:{name:string}) {
+    this.profileExpiry?.clear();this.profileExpiry=undefined;this.autoDispose=true;
     this.sim.add(client.sessionId,auth.name);this.idle.set(client.sessionId,Date.now());
     log('player_joined',{room:this.roomId,players:this.sim.players.size});
   }

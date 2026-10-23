@@ -25,7 +25,7 @@ test('release, movement, weapon switching, airborne state and stale input cancel
  }
  const {s,red}=fixture();Object.assign(red,siteA);ticks(s,40,[[red,plant]]);ticks(s,6);assert.equal(s.bomb?.action,null);
 });
-test('a complete plant overrides the round timer; explosion wins for attackers',()=>{
+test('a planted charge still has a 40-second fuse in an unlimited round',()=>{
  const {s}=planted();s.endsAt=s.time+10;ticks(s,20);assert.equal(s.phase,'playing');s.time=s.bomb!.explodeAt-DT*1000;s.step();assert.equal(s.bomb?.status,'exploded');assert.equal(s.winner,'red');assert.match(s.outcome,/detonated/);
 });
 test('only a living nearby defender can defuse, with a continuous 10 second hold',()=>{
@@ -43,9 +43,14 @@ test('killed or disconnected carriers drop C4 and only attackers can recover it'
  const s=new Simulation('dunes','defusal'),r=s.add('r','Red'),b=s.add('b','Blue'),r2=s.add('r2','Red2');s.step();Object.assign(r,siteA,{protectedUntil:0});Object.assign(r2,siteA);Object.assign(b,siteA);s.damage(r,100,b,'rifle',b);assert.equal(s.bomb?.status,'dropped');
  send(s,b,{interact:true});s.step();assert.equal(s.bomb?.carrierId,null);send(s,r2,{interact:true});s.step();assert.equal(s.bomb?.carrierId,r2.id);s.disconnect(r2.id);assert.equal(s.bomb?.status,'dropped');assert.equal(s.bomb?.carrierId,null);
 });
-test('defusal has no combat respawns; elimination wins for the survivor and a timeout is a draw',()=>{
+test('defusal has no combat respawns and elimination wins for the survivor',()=>{
  const s=new Simulation('dunes','defusal'),r=s.add('r','R'),b=s.add('b','B'),r2=s.add('r2','R2');s.step();r.protectedUntil=0;s.damage(r,100,b,'rifle',b);ticks(s,100);assert.equal(r.hp,0);assert.equal(s.phase,'playing');r2.protectedUntil=0;s.damage(r2,100,b,'rifle',b);s.step();assert.equal(s.winner,'blue');
- const f=fixture();f.s.time=f.s.endsAt;f.s.step();assert.equal(f.s.winner,'draw');
+});
+test('C4 rounds stay active beyond the former timer and after rematch',()=>{
+ const {s}=fixture();assert.equal(s.snapshot().endsAt,0);
+ for(const elapsed of [116000,600000,86400000]){s.time=elapsed;s.step();assert.equal(s.phase,'playing');assert.equal(s.winner,null);}
+ const {s:finished}=planted();finished.time=finished.bomb!.explodeAt;finished.step();assert.equal(finished.phase,'finished');
+ finished.rematch();assert.equal(finished.snapshot().endsAt,0);finished.time+=86400000;finished.step();assert.equal(finished.phase,'playing');assert.equal(finished.winner,null);
 });
 test('eliminating attackers after planting does not stop the fuse',()=>{
  const {s,red,blue}=planted();red.protectedUntil=0;s.damage(red,100,blue,'rifle',blue);s.step();assert.equal(s.phase,'playing');assert.equal(s.bomb?.status,'planted');
