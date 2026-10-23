@@ -152,3 +152,7 @@ gcloud iam service-accounts delete desert-fps-runtime@nood-429501.iam.gserviceac
 Cloud Build source archives and retained logs can remain after deleting the service; inspect the project's build history before removing only this game's artifacts. No unrelated resources should be removed.
 
 References: [Cloud Run WebSockets](https://docs.cloud.google.com/run/docs/triggering/websockets), [session affinity](https://docs.cloud.google.com/run/docs/configuring/session-affinity), [Colyseus reconnection](https://docs.colyseus.io/room/reconnection).
+
+### Sniper scope
+
+Pick up the AWP-8 sniper rifle and select your primary weapon with **2**. **Right-click** cycles 3× zoom, 8× zoom and normal view. Scoped aiming slows in proportion to magnification. Firing, reloading, sprinting, switching equipment, death, releasing the mouse or leaving the match clears zoom. Other equipment cannot scope. Damage, ammunition and firing rules are unchanged.

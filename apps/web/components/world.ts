@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import {equipmentModel} from './weapon-models';
 import {buildDust} from './dust-world';
 import {MAPS,type MapId,type Equipment} from '@sirocco/shared';
 export function disposeGroup(group:THREE.Object3D){group.traverse(o=>{if(o instanceof THREE.Mesh||o instanceof THREE.Line)o.geometry.dispose();});group.removeFromParent();}
@@ -69,36 +70,6 @@ export class WorldArt {
     return root;
   }
   private palm(root:THREE.Group,x:number,z:number){const trunk=this.wood,leaf=this.material('#64704b',{side:THREE.DoubleSide});this.cylinder(root,.15,.28,6.7,trunk,x,3.35,z);for(let i=0;i<9;i++){const g=new THREE.Group();g.position.set(x,6.5,z);g.rotation.y=i*Math.PI*2/9;for(let j=0;j<8;j++){const mesh=new THREE.Mesh(new THREE.PlaneGeometry(.7-j*.06,.75),leaf);mesh.position.set(0,-j*j*.022,-j*.38);mesh.rotation.x=-Math.PI/2-j*.07;mesh.rotation.z=(j%2?.12:-.12);g.add(mesh);}root.add(g);}}
-  weapon(kind:Equipment,viewmodel=true){
-    const g=new THREE.Group(),steel=this.metal,poly=this.dark,wood=this.wood;const pistol=kind==='pistol',smg=kind==='smg',dmr=kind==='marksman';
-    if(kind==='bomb'){
-      this.box(g,.38,.19,.3,poly,0,0,0);this.box(g,.32,.035,.27,wood,0,.11,0);
-      this.box(g,.16,.02,.075,this.material('#98ae76',{emissive:'#425b20',emissiveIntensity:.5}),-.065,.14,-.06);
-      for(let row=0;row<3;row++)for(let col=0;col<3;col++)this.box(g,.028,.018,.028,steel,.025+col*.04,.145,-.07+row*.04);
-      const light=new THREE.Mesh(new THREE.SphereGeometry(.024,8,8),this.material('#ff533c',{emissive:'#ff3820',emissiveIntensity:2}));light.name='bombLight';light.position.set(-.13,.15,.07);g.add(light);
-      if(viewmodel){this.box(g,.13,.11,.16,wood,-.19,-.07,.03);this.box(g,.13,.11,.16,wood,.19,-.07,.03);}return g;
-    }
-    if(kind==='knife'){
-      this.box(g,.08,.085,.22,poly,0,0,.02);this.box(g,.22,.035,.045,steel,0,0,-.11);
-      const shape=new THREE.Shape();shape.moveTo(-.045,0);shape.lineTo(.045,0);shape.lineTo(.04,.31);shape.lineTo(0,.44);shape.lineTo(-.04,.31);shape.closePath();
-      const blade=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:.018,bevelEnabled:true,bevelSegments:1,steps:1,bevelSize:.004,bevelThickness:.004}),steel);blade.rotation.x=-Math.PI/2;blade.position.set(0,0,-.13);g.add(blade);
-      if(viewmodel)this.box(g,.14,.13,.18,this.wood,.02,-.055,.035);return g;
-    }
-    if(kind==='grenade'){
-      const shell=new THREE.Mesh(new THREE.SphereGeometry(.105,12,10),poly);shell.scale.y=1.25;shell.position.y=.02;g.add(shell);
-      this.box(g,.065,.07,.065,steel,0,.16,0);this.box(g,.035,.2,.03,steel,.09,.1,0);
-      const ring=new THREE.Mesh(new THREE.TorusGeometry(.045,.008,6,16),steel);ring.position.set(-.065,.18,0);g.add(ring);
-      if(viewmodel)this.box(g,.15,.11,.14,this.wood,.01,-.08,.04);return g;
-    }
-    this.box(g,.12,.14,pistol?.24:smg?.39:.57,steel,0,.02,-.08);
-    this.box(g,.09,.22,.1,poly,0,-.13,.01).rotation.x=-.22;
-    if(!pistol){this.box(g,.09,.2,dmr?.12:.17,poly,0,-.14,-.15).rotation.x=.15;this.box(g,.1,.13,.24,dmr?wood:poly,0,0,.29);this.box(g,.13,.18,.06,poly,0,-.015,.4);this.box(g,.13,.13,.25,poly,0,.015,-.36);}
-    const barrel=this.cylinder(g,.025,.025,pistol?.16:dmr?.55:.3,steel,0,.035,pistol?-.23:dmr?-.68:-.51);barrel.rotation.x=Math.PI/2;
-    this.box(g,.025,.045,.035,steel,0,.12,pistol?-.15:-.32);this.box(g,.05,.04,.06,steel,0,.12,.03);
-    if(dmr){const scope=this.cylinder(g,.05,.05,.28,steel,0,.17,-.13);scope.rotation.x=Math.PI/2;this.box(g,.04,.07,.18,poly,0,.11,-.13);}
-    // Gloves and forearms keep the viewmodel grounded in a first-person silhouette.
-    if(viewmodel){const glove=this.material('#695f4c');this.box(g,.14,.2,.14,glove,.03,-.16,.04);if(!pistol)this.box(g,.14,.13,.19,glove,-.03,-.1,-.34);}
-    return g;
-  }
+  weapon(kind:Equipment,viewmodel=true,heldByAvatar=false){return equipmentModel(this,kind,viewmodel,heldByAvatar);}
   destroy(){for(const m of this.materials)m.dispose();for(const t of this.textures)t.dispose();}
 }

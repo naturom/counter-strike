@@ -57,3 +57,24 @@ export class FootstepTracker {
   this.distance%=stride;this.last=time;return {crouched:!!p.crouched,sprint};
  }
 }
+
+/** Air-to-ground impacts are independent of walking distance, so standing jumps
+ * also make a sound. Ignore tiny ground snaps, stale packets and teleports. */
+export class LandingTracker {
+ private previous?:Motion;private time=0;private airborneAt:number|null=null;private peak=0;private speed=0;
+ reset(){this.previous=undefined;this.airborneAt=null;this.peak=0;this.speed=0;}
+ update(p:Motion,time:number,alive=true):{strength:number}|undefined{
+  const old=this.previous,oldTime=this.time,elapsed=time-oldTime;
+  if(!alive){this.reset();return;}
+  this.previous={...p};this.time=time;
+  if(!old||elapsed<=0||elapsed>250||Math.hypot(p.x-old.x,p.z-old.z)>2||Math.abs(p.y-old.y)>3){this.airborneAt=null;this.speed=0;this.peak=p.y;return;}
+  if(!p.grounded){
+   if(this.airborneAt===null){this.airborneAt=oldTime;this.peak=Math.max(old.y,p.y);this.speed=0;}
+   this.peak=Math.max(this.peak,p.y);this.speed=Math.max(this.speed,-p.vy,(old.y-p.y)/(elapsed/1000));return;
+  }
+  const flight=this.airborneAt===null?0:time-this.airborneAt,drop=this.peak-p.y,speed=Math.max(this.speed,-old.vy);
+  this.airborneAt=null;this.peak=p.y;this.speed=0;
+  if(old.grounded||flight<80||drop<.12||speed<1.5)return;
+  return {strength:Math.min(1,Math.max(0,(speed-2)/9))*(p.crouched?.75:1)};
+ }
+}

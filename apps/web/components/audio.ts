@@ -19,7 +19,7 @@ export class GameAudio {
     const c=this.context,route=this.route(at);if(!c||!route||!this.noise)return;const n=c.createBufferSource(),filter=c.createBiquadFilter(),g=c.createGain();n.buffer=this.noise;filter.type=type;filter.frequency.value=freq;filter.Q.value=.7;const t=c.currentTime+delay;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(volume,t+.004);g.gain.exponentialRampToValueAtTime(.0001,t+duration);n.connect(filter).connect(g).connect(route);n.start(t,Math.random());n.stop(t+duration+.02);n.onended=()=>{n.disconnect();filter.disconnect();g.disconnect();route.disconnect();};
   }
   private tone(freq:number,end:number,duration:number,volume:number,at?:Vec3,delay=0){const c=this.context,route=this.route(at);if(!c||!route)return;const o=c.createOscillator(),g=c.createGain(),t=c.currentTime+delay;o.type='triangle';o.frequency.setValueAtTime(freq,t);o.frequency.exponentialRampToValueAtTime(end,t+duration);g.gain.setValueAtTime(volume,t);g.gain.exponentialRampToValueAtTime(.0001,t+duration);o.connect(g).connect(route);o.start(t);o.stop(t+duration);o.onended=()=>{o.disconnect();g.disconnect();route.disconnect();};}
-  private play(kind:SoundKind,at:Vec3|undefined,range:number,level:number,occluded=false,owner?:string,delay=0){
+  private play(kind:SoundKind,at:Vec3|undefined,range:number,level:number,occluded=false,owner?:string,delay=0,playbackRate=1){
     const c=this.context;if(!c||!this.master||!this.enabled)return;
     const mix=spatialMix(this.listener,this.yaw,at,range,occluded);if(mix.gain<.001)return;
     const variant=this.lastVariant=(this.lastVariant+1+Math.floor(Math.random()*3))%4,key=`${kind}:${variant}`;let buffer:AudioBuffer|undefined;
@@ -27,7 +27,7 @@ export class GameAudio {
     else{buffer=this.combatBuffers.get(key);if(!buffer){const signal=combatSignal(c.sampleRate,kind,variant);buffer=c.createBuffer(1,signal.length,c.sampleRate);buffer.getChannelData(0).set(signal);this.combatBuffers.set(key,buffer);}}
     while(this.voices.size>=48){const oldest=this.voices.values().next().value!;oldest.stop();this.voices.delete(oldest);}
     const source=c.createBufferSource(),filter=c.createBiquadFilter(),gain=c.createGain(),pan=c.createStereoPanner();
-    source.buffer=buffer;filter.type='lowpass';filter.frequency.value=mix.cutoff;filter.Q.value=.5;gain.gain.value=mix.gain*level;pan.pan.value=mix.pan;
+    source.buffer=buffer;source.playbackRate.value=playbackRate;filter.type='lowpass';filter.frequency.value=mix.cutoff;filter.Q.value=.5;gain.gain.value=mix.gain*level;pan.pan.value=mix.pan;
     source.connect(filter).connect(gain).connect(pan).connect(this.master);this.voices.add(source);
     if(owner){this.cancelReload(owner);this.reloads.set(owner,source);}
     source.onended=()=>{this.voices.delete(source);if(owner&&this.reloads.get(owner)===source)this.reloads.delete(owner);source.disconnect();filter.disconnect();gain.disconnect();pan.disconnect();};
@@ -38,6 +38,11 @@ export class GameAudio {
   cancelReload(owner:string){const source=this.reloads.get(owner);if(source){source.stop();this.reloads.delete(owner);}}
   syncReloads(active:Set<string>){for(const owner of this.reloads.keys())if(!active.has(owner))this.cancelReload(owner);}
   step(crouched:boolean,at?:Vec3,surface:Surface='stone',sprint=false,occluded=false){this.play(`step-${surface}`,at,crouched?7:sprint?32:25,crouched?.16:sprint?.85:.62,occluded);}
+  land(strength:number,at?:Vec3,surface:Surface='stone',occluded=false){
+    const impact=Math.min(1,Math.max(0,strength));
+    this.play(`step-${surface}`,at,36,.64+impact*.35,occluded,undefined,0,.86);
+    this.play(`step-${surface}`,at,36,.26+impact*.22,occluded,undefined,.045,.94);
+  }
   knife(at?:Vec3,occluded=false,hit:'air'|'player'|'wall'='air'){
     this.play('knife',at,13,.4,occluded);
     if(hit!=='air')this.play(hit==='player'?'knife-hit':'knife-wall',at,18,hit==='player'?.75:.6,occluded,undefined,.105);

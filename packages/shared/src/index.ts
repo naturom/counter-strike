@@ -20,7 +20,7 @@ export const WEAPONS = {
   rifle: { damage: 25, interval: 100, magazine: 30, reload: 1800, label: 'AR-30', automatic: true },
   pistol: { damage: 20, interval: 200, magazine: 12, reload: 1200, label: 'P-12', automatic: false },
   smg: { damage: 17, interval: 1000 / 900, magazine: 40, reload: 1500, label: 'V-40 SMG', automatic: true },
-  marksman: { damage: 70, interval: 650, magazine: 8, reload: 2400, label: 'DMR-8', automatic: false },
+  marksman: { damage: 70, interval: 650, magazine: 8, reload: 2400, label: 'AWP-8', automatic: false },
 } as const;
 export const weaponLabel = (weapon: Equipment) => weapon === 'bomb' ? 'C4' : weapon === 'knife' ? 'KNIFE' : weapon === 'grenade' ? 'FRAG' : WEAPONS[weapon].label;
 export type Solid = { x: number; y: number; z: number; w: number; h: number; d: number; kind: 'wall' | 'crate' | 'roof' | 'floor'; polygon?: [number,number][]; ramp?: {axis:'x'|'z';from:number;to:number}; style?: 'plaster'|'kasbah'|'stone'|'road'|'tile'|'door'|'metal'; label?:string;vehicle?:{part:'body'|'cabin'|'cargo';height:number;truck:boolean} };
