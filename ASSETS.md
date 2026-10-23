@@ -10,6 +10,10 @@ Poly Haven publishes these assets under [CC0](https://polyhaven.com/license). In
 | --- | --- |
 | [Sandstone Cracks](https://polyhaven.com/a/sandstone_cracks) | `apps/web/public/textures/stone-{color,normal,rough}.jpg` |
 | [Aerial Sand](https://polyhaven.com/a/aerial_sand) | `apps/web/public/textures/sand-{color,normal,rough}.jpg` |
+| [Painted Plaster Wall](https://polyhaven.com/a/painted_plaster_wall) | `apps/web/public/textures/plaster-{color,normal,rough}.jpg` |
+| [Cobblestone Floor 08](https://polyhaven.com/a/cobblestone_floor_08) | `apps/web/public/textures/paving-{color,normal,rough}.jpg` |
+| [Weathered Brown Planks](https://polyhaven.com/a/weathered_brown_planks) | `apps/web/public/textures/timber-{color,normal,rough}.jpg` |
+| [Asphalt 02](https://polyhaven.com/a/asphalt_02) | `apps/web/public/textures/asphalt-{color,normal,rough}.jpg` |
 
 ## Original generated content
 
@@ -24,3 +28,7 @@ Original procedural gloved hands, fingers, sleeve geometry and woven fabric text
 `weapon-models.ts` authors distinct original rifle, pistol, SMG, AWP-style sniper, knife, frag grenade and C4 meshes. It includes receiver profiles, magazines, scope glass and adjustment turrets, brushed metal finishes, moulded polymer, grenade markings and electronics. The same equipment bodies are used for held weapons, remote players and world pickups. Visual scope reference: [Counter-Strike sniper scope screenshot](https://www.gamewatcher.com/mods/counter-strike-source-mod/amh-awp-map). The original 3×/8× scope uses a circular mask and a mathematically narrower world-camera field of view; it does not use Valve assets.
 
 Knife attacks use original 440 ms forehand and backhand animation curves. The blade and gripping hand share a wrist pivot, the free hand retracts out of the blade path, and the ready pose is restored before the existing 500 ms attack interval. Reduced-motion preferences reduce the slash amplitude. Hit detection, damage and reach are unchanged.
+
+## Environment detail pass
+
+Doors use the exact orientation, footprint and heights of their shared collision leaves, with individual vertical timber planks, narrow iron straps, two-sided handles and hinge fittings. Mid and Long leaves meet structural jambs; B leaves reach the sloping threshold and retain their previous top elevation. Gate headers and jambs use the shared map geometry. Original plaster weathering, wall chips, floor contact shading, shutter frames, rooftop tanks, antennae, supported awnings, street lamps, vehicle trim and curved palm fronds are code-generated details. Static surfaces are batched by material; texture maps are stored locally.

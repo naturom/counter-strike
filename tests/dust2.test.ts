@@ -52,7 +52,7 @@ const escapes:Record<string,[number,number][]>={
   'Pit rear and stairs':[[900,760],[900,600],[900,545],[900,510],[880,430]],
   'Long bevel corner':[[932.5,322.5],[900,310],[880,285]],
   'Catwalk recess':[[590,380],[590,410],[640,410],[645,315]],
-  'Long door side':[[677.5,560],[695,560],[695,545],[745,530]],
+  'Long door side':[[689,560],[695,560],[695,545],[745,530]],
   'Short north landing':[[645,120],[645,197],[680,178],[735,180]],
 };
 for(const [name,points] of Object.entries(escapes))test(`Dust II escape: ${name}`,()=>{walk(points);walk([...points].reverse());});
@@ -70,4 +70,25 @@ test('B door leaves sit on a continuous ramp through the entire angled doorway',
     const p=dustPoint(u,v),expected=(319-u)/65*2;
     assert.ok(Math.abs(groundAt(p,map.solids)-expected)<1e-5,`door approach drops into a trench at ${u},${v}`);
   }
+});
+
+test('Long chamber doorway sides are sealed while the northern entrance remains open',()=>{
+ for(const [u,v] of [[678,558],[678,565],[740,561],[740,573]]){
+  const p=dustPoint(u,v,2.1);assert.ok(map.solids.some(b=>intersects(p,b)),`open chamber side at ${u},${v}`);
+ }
+ walk([[695,605],[695,560],[695,540],[745,530]]);
+});
+
+test('Mid gate east return joins the adjacent building without a side opening',()=>{
+ for(const u of [505,512,520,530])assert.ok(map.solids.some(b=>intersects(dustPoint(u,358,0),b)),`gap beside Mid door at ${u}`);
+ walk([[485,390],[465,345],[470,300]]);
+});
+
+test('enclosed tunnel stairs descend on real treads and remain walkable in both directions',()=>{
+ const treads=map.solids.filter(b=>b.label?.startsWith('Tunnel stair tread'));
+ assert.equal(treads.length,16);assert.ok(treads.every(b=>!b.ramp));
+ for(let i=1;i<treads.length;i++)assert.ok(Math.abs(treads[i].y+treads[i].h/2-treads[i-1].y-treads[i-1].h/2-2.9/16)<1e-5);
+ for(const points of [[[275,495],[310,495],[310,410],[400,410],[445,410]],[[445,410],[400,410],[310,410],[310,495],[275,495]]] as [number,number][][])walk(points);
+ for(const [u,v,y] of [[284,455,4],[310,470,6.7],[430,391,1],[430,433,1]])assert.ok(map.solids.some(b=>intersects(dustPoint(u,v,y),b)),`enclosure gap at ${u},${v}`);
+ assert.ok(wallDistance(dustPoint(400,411,1.6),{x:1,y:0,z:0},map.solids)>4,'exit doorway must remain open');
 });

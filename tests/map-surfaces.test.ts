@@ -35,7 +35,9 @@ test('Dust II rendered floors match collision heights without holes or coinciden
     ray.set(new THREE.Vector3(x,25,z),new THREE.Vector3(0,-1,0));
     const hits=ray.intersectObjects(meshes,false);
     assert.ok(hits.length>0,`missing visible floor at ${x}, ${z}`);
-    assert.ok(Math.abs(hits[0].point.y-groundAt({x,z},floors))<1e-4,`render/collision height mismatch at ${x}, ${z}`);
+    // groundAt includes a 1mm seam margin; a ray has no radius at stair risers.
+    const exactFloors=floors.filter(b=>footprint({x,z},b,0));
+    assert.ok(Math.abs(hits[0].point.y-groundAt({x,z},exactFloors))<1e-4,`render/collision height mismatch at ${x}, ${z}`);
     for(let k=1;k<hits.length;k++)assert.ok(Math.abs(hits[k].point.y-hits[k-1].point.y)>1e-4,`duplicate floor at ${x}, ${z}, ${hits[k].point.y}`);
   }
   meshes.forEach(m=>m.geometry.dispose());material.dispose();

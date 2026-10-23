@@ -65,7 +65,9 @@ poly('Mid bazaar',[[548,436],[675,436],[675,464],[690,464],[690,553],[673,553],[
 poly('Catwalk building',[[532,285],[616,285],[616,372],[576,372],[576,386],[532,386]],9.2,0,'plaster');
 rect('Catwalk east block',678,273,164,183,11.3,0,'wall','plaster');
 poly('Long door shop',[[738,580],[756,559],[778,580],[778,690],[846,690],[846,790],[738,790]],10.6,0,'plaster');
-rect('Long vestibule west',674,569,8,107,7.6,0,'wall','plaster');
+rect('Long vestibule west',674,550,8,126,7.6,0,'wall','plaster');
+// Seal the chamber side beside the northern portal, joining the shop bevel.
+poly('Long vestibule east return',[[738,550],[740,550],[758,561],[738,584]],7.6,0,'plaster');
 rect('T spawn mid screen',344,875,218,6,5.8,0,'wall','kasbah');
 rect('T spawn west retaining',153,766,8,115,4.1,0,'wall','kasbah');
 
@@ -91,8 +93,10 @@ ramp('B exit return',170,370,116,44,'z',2,3.2);
 // Cover both angled door leaves, including their outer edges, with one ramp.
 // The old narrow threshold left trenches alongside the approach.
 ramp('B doors threshold',254,220,65,58,'x',2,0);
-// The narrow lower tunnel flight drops toward Mid; the corridor stays under roof.
-ramp('Tunnel stairs',286,438,44,56,'z',.3,3.2);
+// Enclosed stone flight: actual walkable treads shared by rendering and movement.
+for(let step=0;step<16;step++)floor(`Tunnel stair tread ${step+1}`,286,438+step*3.5,44,3.5,.3+(step+1)*2.9/16,'tile');
+rect('Tunnel stairwell west',282,436,4,48,6.6,0,'wall','kasbah');
+rect('Tunnel stairwell ceiling',282,438,48,64,.35,6.6,'roof','kasbah');
 floor('Tunnel stair landing',286,494,44,8,3.2);
 floor('Lower tunnels',286,386,160,52,.3);
 ramp('Lower tunnel exit',420,386,26,52,'x',.3,0);
@@ -140,20 +144,28 @@ rect('Short parapet west bridge',615,155,4,118,1,3.8,'wall','plaster');
 crate('CT boost low',686,221,21,18,.9,0);crate('CT boost middle',707,221,21,18,1.8,0);crate('CT boost high',728,221,21,18,2.7,0);
 
 // Door leaves, lintels, tunnels and gameplay cover. Openings are deliberately kept.
-wall('Mid doors left',[431,359],[456,375],3.25,0,'door',3);
-wall('Mid doors right',[477,355],[501,365],3.25,0,'door',3);
+wall('Mid doors left',[428,359],[456,375],3.25,0,'door',3);
+wall('Mid doors right',[477,355],[504,359],3.25,0,'door',3);
+rect('Mid gate east jamb',501,354,33,9,3.25,0,'wall','kasbah');
 rect('Mid gate lintel',428,354,76,9,1.5,3.25,'roof','kasbah');
-wall('Long doors outer',[688,664],[708,652],3.7,2.1,'door',3);
-wall('Long doors inner',[709,568],[730,555],3.7,2.1,'door',3);
+wall('Long doors outer',[682,665],[708,652],3.7,2.1,'door',3);
+wall('Long doors inner',[709,568],[738,553],3.7,2.1,'door',3);
+for(const v of [550,665]){rect('Long gate west jamb',680,v,2,v===550?6:7,3.7,2.1,'wall','plaster');rect('Long gate east jamb',738,v,2,v===550?6:7,3.7,2.1,'wall','plaster');}
 rect('Long gate lintel south',682,665,56,7,1.5,5.8,'roof','plaster');
 rect('Long gate lintel north',682,550,56,7,1.5,5.8,'roof','plaster');
 rect('Long chamber roof',682,557,56,110,.35,6.8,'roof','plaster');
-wall('B doors north',[260,235],[281,224],3.6,1.8,'door',3);
-wall('B doors south',[260,264],[281,274],3.6,1.8,'door',3);
+wall('B doors north',[260,232],[281,224],4.35,1.05,'door',3);
+wall('B doors south',[260,268],[281,274],4.35,1.05,'door',3);
+rect('B gate lintel',254,232,9,36,.65,5.4,'roof','kasbah');
 rect('Upper tunnel roof',66,414,220,30,.5,6.6,'roof','kasbah');
 rect('Upper tunnel roof south',66,478,220,24,.5,6.6,'roof','kasbah');
 rect('B tunnel roof',98,327,40,87,.45,6.6,'roof','kasbah');
 rect('Lower tunnel roof',286,386,142,52,.45,3.4,'roof','kasbah');
+// Framed exit from the low passage, opening toward Mid.
+rect('Lower tunnel exit north jamb',428,386,8,12,3.4,0,'wall','kasbah');
+rect('Lower tunnel exit south jamb',428,426,8,12,3.4,0,'wall','kasbah');
+rect('Lower tunnel gate lintel',428,398,8,28,.5,2.9,'roof','kasbah');
+wall('Lower tunnel exit door',[430,398],[447,398],2.75,0,'door',1.5);
 crate('Xbox',451,401,28,26,1.55,0);
 crate('B default',180,145,21,22,1.45,2.65);
 crate('B double stack',220,119,25,28,2.55,2.65);
