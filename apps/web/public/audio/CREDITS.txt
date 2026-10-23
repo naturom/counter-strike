@@ -1,0 +1,52 @@
+RECORDED FOOTSTEPS, RELOADS AND KNIFE FOLEY
+
+Footsteps on different surfaces, mastered/compiled by congusbongus:
+https://opengameart.org/content/footsteps-on-different-surfaces
+
+footsteps/stone-0.wav through stone-3.wav:
+Derived from footstep-concrete.wav by swuing
+http://www.freesound.org/people/swuing/sounds/38873/
+Creative Commons Attribution 3.0: https://creativecommons.org/licenses/by/3.0/
+
+footsteps/wood-0.wav through wood-3.wav:
+Derived from footstep-wood.wav by swuing
+https://freesound.org/people/swuing/sounds/38876/
+Creative Commons Attribution 3.0: https://creativecommons.org/licenses/by/3.0/
+
+footsteps/metal-0.wav through metal-3.wav:
+Derived from fboots on aluminum ladder 01 by Eelke
+https://freesound.org/people/Eelke/sounds/462598/
+Creative Commons Attribution 3.0: https://creativecommons.org/licenses/by/3.0/
+
+footsteps/grit-0.wav through grit-3.wav:
+Derived from Pack: Gravel Footsteps by Ali_6868
+https://freesound.org/people/Ali_6868/packs/21608/
+CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/
+
+Reloads: gunreload1.wav and assaultriflereload1_0.wav by SpringySpringo
+https://opengameart.org/content/gun-reload-sounds
+Recorded with airsoft guns. CC0 1.0:
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Changes for this game: selected four footstep takes per surface, converted to
+mono 22.05 kHz PCM WAV, peak-adjusted and given short edge fades. Reload recordings were trimmed, peak-adjusted, given
+short edge fades, and edited into sequences matching the game's reload times.
+Mechanical transients retain their original speed and pitch.
+No affiliation or endorsement by any contributor is implied.
+
+Knife swings: swosh-01.flac through swosh-04.flac by qubodup (Iwan Gabovitch)
+Swish - bamboo stick weapon swhoshes: actual bamboo air-swish recordings.
+https://opengameart.org/content/swish-bamboo-stick-weapon-swhoshes
+CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/
+
+Knife player-impact Foley: thwack-02.wav and thwack-03.wav by Jordan Irwin
+(AntumDeluge), Thwack Sounds 1.0. Recorded object impacts.
+https://opengameart.org/content/thwack-sounds
+CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/
+
+Knife wall contacts: metalClick.ogg and metalLatch.ogg by Kenney Vleugels
+(Kenney), RPG Audio. https://kenney.nl/assets/rpg-audio
+CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/
+
+Knife changes: trimmed recording onset/tail, converted to mono 22.05 kHz PCM
+WAV, peak-adjusted, added 2 ms edge fades. Original speed/pitch retained.

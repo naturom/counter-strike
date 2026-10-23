@@ -1,5 +1,7 @@
+import type {Room} from '@colyseus/sdk';
+import {LatencyMeter} from './LatencyMeter';
 import {MAPS,type Snapshot,type Player} from '@sirocco/shared';
-export function Minimap({snapshot,me}:{snapshot:Snapshot;me:Player}){
+export function Minimap({snapshot,me,room}:{snapshot:Snapshot;me:Player;room:Room|null}){
   const map=MAPS[snapshot.mapId];if(!map.bounds)return null;
   const {minX,maxX,minZ,maxZ}=map.bounds;
   const point=(x:number,z:number)=>`${x},${z}`;
@@ -13,6 +15,6 @@ export function Minimap({snapshot,me}:{snapshot:Snapshot;me:Player}){
       {snapshot.players.filter(p=>p.hp>0&&p.team===me.team&&p.id!==me.id).map(p=><circle key={p.id} cx={p.x} cy={p.z} r="1.5" fill="#8dc9e5"/>)}
       {snapshot.bomb&&(snapshot.bomb.status==='planted'||me.team==='red'&&snapshot.bomb.status==='dropped')&&<g transform={`translate(${snapshot.bomb.x} ${snapshot.bomb.z})`}><rect x="-2" y="-2" width="4" height="4" fill="#ff985d"/><text y="-3" textAnchor="middle" fontSize="4" fill="#ffe4b9">C4</text></g>}
       <g transform={`translate(${me.x} ${me.z}) rotate(${-me.yaw*180/Math.PI})`}><path d="M 0 -4 L -2.2 2 L 0 1 L 2.2 2 Z" fill="#fff4cb" stroke="#15221b" strokeWidth=".5"/></g>
-    </svg><span>{location?.name??'DUST II'}</span>
+    </svg><span>{location?.name??'DUST II'}</span><LatencyMeter room={room}/>
   </aside>;
 }
