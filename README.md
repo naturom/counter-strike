@@ -16,18 +16,18 @@ Click **Enter the arena** to capture your mouse. Escape releases it.
 | R | Reload |
 | 1 | Knife |
 | 2 / 3 | Equipped primary gun / pistol |
-| E | Pick up a nearby gun or dropped C4; hold near planted C4 to defuse as blue |
+| E | Pick up a nearby gun or dropped C4; hold near enemy C4 to defuse |
 | 4, then left click | Select and throw a frag grenade |
-| 5, then hold left click | Select carried C4 and plant at A or B (Bomb Defusal) |
+| 5, then hold left click | Select your team’s C4; red plants at A, blue at B |
 | C / Ctrl | Hold to crouch |
 | Tab | Hold scoreboard |
 | Escape | Menu, invite, leave |
 
 Deathmatch rounds last ten minutes or end at 30 kills. Players have 100 HP, respawn in three seconds, and cannot damage teammates. Respawns receive 1.5 seconds of protection, cancelled by firing or throwing a grenade. Rifle: 25 damage, 600 RPM, 30 rounds, 1.8-second reload. Pistol: 20 damage, maximum 300 RPM, 12 rounds, 1.2-second reload. Ammunition reserves are unlimited; magazines and reload times are enforced. Half the connected players must vote to start a rematch.
 
-**Bomb Defusal (Dust II):** Red attacks the blue-defended A/B sites. One red player carries C4. Select it with **5** and hold left click at a site for **3.2 seconds**. After planting, a **40-second fuse** replaces the round clock. Blue holds **E** within reach and line of sight for **10 seconds** to defuse. Moving, jumping, releasing the button, switching away while planting, dying or disconnecting cancels progress. C4 drops on death/disconnect and red teammates can recover it with E. Beeps accelerate toward detonation, with a world device, radar marker, countdown and progress bar.
+**Bomb Defusal (Dust II):** Each team has one C4 and one enemy target: **red attacks A and defends B; blue attacks B and defends A**. One player on each team carries its charge. Select it with **5** and hold left click at your assigned site for **3.2 seconds**. Each planted bomb has its own **40-second fuse**. The first detonation wins; an exact simultaneous detonation is a draw. Hold **E** within reach and line of sight of enemy C4 for **10 seconds** to defuse it. Defusing stops that charge while the round and your own charge continue. Only teammates can recover their dropped C4. Movement, jumping, releasing the button, switching away while planting, dying or disconnecting cancels progress. HUD and radar distinguish your C4 from the enemy’s, with independent countdowns and progress.
 
-Bomb rounds have a **1:55** pre-plant clock and one life once both teams are present. Eliminating attackers before the plant or running out the clock wins for blue; eliminating defenders or detonating C4 wins for red. Killing the last attacker after planting leaves the fuse active. New players joining an active round wait for the next round. Each round ends on the result screen; vote for a rematch to reset the round. While alone, players can explore and practise planting, and the pre-plant clock waits for an opponent. This mode uses the existing loadouts and a ten-second defuse; there is no buy economy or defuse-kit inventory.
+Bomb rounds have a **1:55** pre-plant clock and one life once both teams are present. Any planted charge keeps its fuse running after the clock expires. A team wins by eliminating the opponent once no enemy planted charge remains. Timeout without an active charge, both charges defused, or simultaneous elimination without planted charges results in a draw. Killing a carrier after planting never stops the fuse. Late joiners wait for the next round. Vote for a rematch to reset both teams, charges and equipment. Solo practice waits for an opponent before the pre-plant clock runs. There is no buy economy or defuse-kit inventory.
 
 The knife deals 40 damage within 1.8 metres, with one slash per click and a half-second cooldown. Solid cover, friendly-fire rules and spawn protection apply. It uses no ammunition. Selecting a grenade does not throw it; left-click throws one, and an empty grenade slot shows zero remaining.
 

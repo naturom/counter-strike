@@ -1,18 +1,19 @@
-import {BOMB_RULES,plantSite,type Snapshot,type Player} from '@sirocco/shared';
+import {BOMB_RULES,BOMB_TARGET,plantSite,type Snapshot,type Player} from '@sirocco/shared';
 export function BombHud({snapshot:s,me}:{snapshot:Snapshot;me:Player}){
-  const b=s.bomb;if(!b||s.phase==='finished')return null;
-  const carrier=s.players.find(p=>p.id===b.carrierId),action=b.action;
-  const progress=action?Math.max(0,Math.min(100,(s.time-action.startedAt)/(action.completeAt-action.startedAt)*100)):0;
-  const seconds=b.status==='planted'?Math.max(0,Math.ceil((b.explodeAt-s.time)/1000)):0;
-  let message=me.team==='red'?'Escort the carrier to A or B.':'Defend A and B. Stop the plant.';
-  if(b.carrierId===me.id)message=plantSite(me,s.mapId)?'At a bombsite · 5 selects C4 · hold LEFT CLICK to plant.':'You carry C4 · reach A or B · 5 selects C4.';
-  if(b.status==='dropped')message=me.team==='red'?'C4 dropped · find it and press E to recover.':'C4 dropped · guard it and protect the sites.';
-  if(b.status==='planted')message=me.team==='red'?'Protect C4 until detonation.':`Retake site ${b.siteId} · hold E near C4 for ${BOMB_RULES.defuseMs/1000}s.`;
-  if(me.hp<=0)message='One life this round · watch the result, then vote for a rematch.';
-  return <section className={`bomb-hud ${b.status==='planted'?'armed':''}`} aria-label="Bomb objective" role="status">
-    <strong>{b.status==='planted'?`C4 PLANTED AT ${b.siteId} · ${seconds}s`:me.team==='red'?'ATTACK · PLANT AT A OR B':'DEFEND · PROTECT A AND B'}</strong>
-    <span>{message}</span>
-    {b.status==='carried'&&carrier&&<small>CARRIER · {carrier.id===me.id?'YOU':carrier.name}{!s.roundLive?' · WAITING FOR OPPONENT':''}</small>}
-    {action&&<div className="bomb-progress"><label>{action.kind==='plant'?'PLANTING':'DEFUSING'} · {s.players.find(p=>p.id===action.playerId)?.name}</label><progress value={progress} max="100" aria-label={action.kind==='plant'?'Plant progress':'Defuse progress'}/></div>}
+  const own=s.bombs.find(b=>b.team===me.team),enemy=s.bombs.find(b=>b.team!==me.team);if(!own||!enemy||s.phase==='finished')return null;
+  const target=BOMB_TARGET[me.team],defend=BOMB_TARGET[enemy.team],carrier=s.players.find(p=>p.id===own.carrierId);
+  let message=`Escort your carrier to ${target}. Protect site ${defend}.`;
+  if(own.carrierId===me.id)message=plantSite(me,s.mapId,me.team)?`At site ${target} · 5 selects C4 · hold LEFT CLICK to plant.`:`You carry C4 · plant only at ${target} · 5 selects C4.`;
+  if(own.status==='dropped')message='Your C4 dropped · press E nearby to recover it.';
+  if(own.status==='defused')message=`Your C4 was defused. Eliminate the enemy and defend ${defend}.`;
+  if(own.status==='planted')message=`Protect your C4 at ${target} until detonation.`;
+  if(enemy.status==='planted')message=`ENEMY C4 AT ${defend} · hold E near it for ${BOMB_RULES.defuseMs/1000}s to defuse.`;
+  if(me.hp<=0)message='One life this round · wait for the result.';
+  const armed=s.bombs.some(b=>b.status==='planted');
+  return <section className={`bomb-hud ${armed?'armed':''}`} aria-label="Bomb objective" role="status">
+    <strong>ATTACK {target} · DEFEND {defend}</strong><span>{message}</span>
+    {carrier&&own.status==='carried'&&<small>YOUR CARRIER · {carrier.id===me.id?'YOU':carrier.name}{!s.roundLive?' · WAITING FOR OPPONENT':''}</small>}
+    {s.bombs.filter(b=>b.status==='planted').map(b=><small key={b.team}>{b.team===me.team?'YOUR':'ENEMY'} C4 · SITE {b.siteId} · {Math.max(0,Math.ceil((b.explodeAt-s.time)/1000))}s</small>)}
+    {s.bombs.filter(b=>b.action).map(b=>{const action=b.action!,progress=Math.max(0,Math.min(100,(s.time-action.startedAt)/(action.completeAt-action.startedAt)*100));return <div key={b.team} className="bomb-progress"><label>{action.kind==='plant'?'PLANTING':'DEFUSING'} {b.team.toUpperCase()} C4 · {s.players.find(p=>p.id===action.playerId)?.name}</label><progress value={progress} max="100" aria-label={`${b.team} ${action.kind} progress`}/></div>;})}
   </section>;
 }

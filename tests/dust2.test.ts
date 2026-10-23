@@ -56,3 +56,18 @@ const escapes:Record<string,[number,number][]>={
   'Short north landing':[[645,120],[645,197],[680,178],[735,180]],
 };
 for(const [name,points] of Object.entries(escapes))test(`Dust II escape: ${name}`,()=>{walk(points);walk([...points].reverse());});
+
+test('B exterior walls are supported down to the ground without a crawlable void',()=>{
+  for(const [u,v] of [[259,150],[259,200],[259,222],[259,290],[200,100]]){
+    const low=dustPoint(u,v);assert.ok(map.solids.some(b=>intersects(low,b,1.1)),`unsupported B wall at ${u},${v}`);
+  }
+  // The intended elevated window and doors remain open.
+  const outside=dustPoint(310,200,4);
+  assert.ok(wallDistance(outside,{x:-1,y:0,z:0},map.solids)>6,'B window aperture must remain open');
+});
+test('B door leaves sit on a continuous ramp through the entire angled doorway',()=>{
+  for(const v of [226,230,250,270,274])for(const u of [265,280,300]){
+    const p=dustPoint(u,v),expected=(319-u)/65*2;
+    assert.ok(Math.abs(groundAt(p,map.solids)-expected)<1e-5,`door approach drops into a trench at ${u},${v}`);
+  }
+});

@@ -20,7 +20,7 @@ export function buildDust(art:WorldArt){
   const floors=DUST2.solids.filter(b=>b.kind==='floor');
   for(const b of DUST2.solids){
     // Vehicles have individually modelled bodies matching these collision bounds.
-    if(['Long car','B car','CT truck'].includes(b.label??''))continue;
+    if(b.vehicle)continue;
     const mesh=new THREE.Mesh(b.kind==='floor'?visibleFloorGeometry(b,floors):solidGeometry(b),material(b));mesh.castShadow=b.kind!=='floor';mesh.receiveShadow=true;root.add(mesh);
     if(b.kind==='crate'&&b.style!=='metal'){
       for(const y of [b.y-b.h/2+.12,b.y+b.h/2-.12])box(b.w+.035,.11,b.d+.035,iron,b.x,y,b.z);
@@ -102,10 +102,10 @@ export function buildDust(art:WorldArt){
     art.sign(root,text,p.x,y+3.15,p.z+.16,0,color,3.6);
     const canopy=box(3.7,.12,1.25,color==='#a7664b'?red:teal,p.x,y+2.85,p.z+.6);canopy.rotation.x=.08;
   }
-  for(const b of DUST2.solids.filter(b=>['Long car','B car','CT truck'].includes(b.label??'')))vehicle(b,b.label==='CT truck');
+  for(const b of DUST2.solids.filter(b=>b.vehicle?.part==='body'))vehicle(b,!!b.vehicle?.truck);
   // B floor and A platform markings; planes have no physical obstruction.
-  for(const [u,v,y,label] of [[195,151,2.66,'B'],[813,174,3.81,'A']] as const){
-    const p=dustPoint(u,v);groundMark(p.x,y,p.z,label,red);
+  for(const site of DUST2.bombSites??[]){
+    const p=site.marker;groundMark(p.x,p.y,p.z,site.id,p.size);
   }
   for(const [u,v,y,label,rot] of [[422,685,4,'← B',0],[565,835,4.7,'A →',0],[426,320,2.3,'B ←',Math.PI/2],[841,318,4.3,'A ↑',Math.PI/2],[78,238,4.3,'B',Math.PI/2]] as const){const p=dustPoint(u,v);art.sign(root,label,p.x,y,p.z,rot,'#aa604b',1.8);}
   // Curbs and painted lane boundaries track the Long slope.
@@ -126,11 +126,11 @@ export function buildDust(art:WorldArt){
     const shape=new THREE.Shape();shape.moveTo(-w/2,h+.65);shape.lineTo(w/2,h+.65);shape.lineTo(w/2,h-.6);shape.absellipse(0,h-.6,w/2,.6,0,Math.PI,false,0);shape.closePath();
     const mesh=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:.24,bevelEnabled:false}),mat);mesh.position.set(x,y,z);mesh.rotation.y=rotation;mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);
   }
-  function groundMark(x:number,y:number,z:number,label:string,mat:THREE.Material){
-    const c=document.createElement('canvas');c.width=c.height=256;const ctx=c.getContext('2d')!;ctx.strokeStyle='#b85b37';ctx.lineWidth=8;ctx.strokeRect(12,12,232,232);ctx.fillStyle='#b85b37';ctx.font='bold 170px sans-serif';ctx.textAlign='center';ctx.fillText(label,128,187);const texture=new THREE.CanvasTexture(c);texture.colorSpace=THREE.SRGBColorSpace;art.textures.push(texture);const material=art.material('#fff',{map:texture,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1});const mesh=new THREE.Mesh(new THREE.PlaneGeometry(3.6,3.6),material);mesh.rotation.x=-Math.PI/2;mesh.position.set(x,y+.02,z);root.add(mesh);
+  function groundMark(x:number,y:number,z:number,label:string,size:number){
+    const c=document.createElement('canvas');c.width=c.height=256;const ctx=c.getContext('2d')!;ctx.strokeStyle='#b85b37';ctx.lineWidth=8;ctx.strokeRect(12,12,232,232);ctx.fillStyle='#b85b37';ctx.font='bold 170px sans-serif';ctx.textAlign='center';ctx.fillText(label,128,187);const texture=new THREE.CanvasTexture(c);texture.colorSpace=THREE.SRGBColorSpace;art.textures.push(texture);const material=art.material('#fff',{map:texture,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1});const mesh=new THREE.Mesh(new THREE.PlaneGeometry(size,size),material);mesh.rotation.x=-Math.PI/2;mesh.position.set(x,y+.02,z);root.add(mesh);
   }
   function vehicle(b:Solid,truck:boolean){
-    const g=new THREE.Group();g.position.set(b.x,b.y-b.h/2,b.z);g.scale.y=b.h/1.5;if(b.w>b.d)g.rotation.y=Math.PI/2;root.add(g);
+    const g=new THREE.Group();g.position.set(b.x,b.y-b.h/2,b.z);g.scale.y=(b.vehicle?.height??b.h)/1.5;if(b.w>b.d)g.rotation.y=Math.PI/2;root.add(g);
     const length=Math.max(b.w,b.d),width=Math.min(b.w,b.d),body=truck?blue:chalk;
     art.box(g,width,.55,length,body,0,.65,0);art.box(g,width*.85,.6,length*.47,body,0,1.18,-.15);
     art.box(g,width*.78,.44,.04,glass,0,1.18,-length*.26);art.box(g,width*.78,.4,.04,glass,0,1.18,length*.2);

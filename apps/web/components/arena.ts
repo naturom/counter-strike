@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {Sky} from 'three/examples/jsm/objects/Sky.js';
 import RAPIER from '@dimforge/rapier3d-compat';
-import {MAPS,DEFAULT_MAP,DT,move,wallDistance,plantSite,canReachBomb,neutralInput,eyeOf,nearestPickup,weaponLabel,isGun,type MapId,type Equipment,type Motion,type Input,type Snapshot,type Player,type CombatEvent} from '@sirocco/shared';
+import {MAPS,DEFAULT_MAP,DT,move,wallDistance,plantSite,canReachBomb,neutralInput,eyeOf,nearestPickup,weaponLabel,isGun,type Team,type MapId,type Equipment,type Motion,type Input,type Snapshot,type Player,type CombatEvent} from '@sirocco/shared';
 import {MAP_TOUR} from './map-tour';
 import {solidGeometry} from './map-geometry';
 import {GameAudio} from './audio';
@@ -17,7 +17,7 @@ export class Arena {
   private mapId:MapId=DEFAULT_MAP;private roots=new Map<MapId,THREE.Group>();private mapRoot?:THREE.Group;
   private avatars=new Map<string,THREE.Group>();private gunModels=new Map<Equipment,THREE.Group>();private gun=new THREE.Group();private gunKind:Equipment='rifle';
   private pickups=new Map<string,THREE.Group>();private grenadeMeshes=new Map<number,THREE.Group>();
-  private bombMesh?:THREE.Group;private lastBombBeep=0;
+  private bombMeshes=new Map<Team,THREE.Group>();private lastBombBeeps=new Map<Team,number>();
   private particles:{mesh:THREE.Mesh;body:RAPIER.RigidBody;until:number}[]=[];
   private traces:{object:THREE.Line|THREE.Mesh;until:number;start:number}[]=[];
   private snapshots:{state:Snapshot;received:number}[]=[];private pending:Input[]=[];
@@ -53,7 +53,7 @@ export class Arena {
   private setGun(kind:Equipment){if(this.gunModels.size&&this.gunKind===kind)return;this.gunKind=kind;for(const m of this.gunModels.values())m.visible=false;let m=this.gunModels.get(kind);if(!m){m=this.art.weapon(kind);this.gunModels.set(kind,m);this.gun.add(m);}m.visible=true;this.flash.position.z=kind==='pistol'?-.33:kind==='marksman'?-.97:-.71;}
   private resize(){const r=this.canvas.getBoundingClientRect();this.renderer.setSize(r.width,r.height,false);this.camera.aspect=r.width/r.height;this.camera.updateProjectionMatrix();}
   start(id:string){this.localSteps.reset();this.remoteStep.clear();this.id=id;this.active=true;this.pending=[];this.seq=0;this.snap=undefined;this.snapshots=[];this.keys.clear();this.prompt='';}
-  stop(){this.audio.stopCombat();this.localSteps.reset();this.remoteStep.clear();this.blastShake.strength=0;this.audio.stopExplosions();this.explosions.clear();if(this.bombMesh)this.bombMesh.visible=false;this.active=false;this.snap=undefined;this.gun.visible=false;this.pending=[];document.exitPointerLock();this.callbacks.pickup('');for(const a of this.avatars.values())a.visible=false;for(const g of this.grenadeMeshes.values())disposeGroup(g);this.grenadeMeshes.clear();}
+  stop(){this.audio.stopCombat();this.localSteps.reset();this.remoteStep.clear();this.blastShake.strength=0;this.audio.stopExplosions();this.explosions.clear();for(const mesh of this.bombMeshes.values())mesh.visible=false;this.active=false;this.snap=undefined;this.gun.visible=false;this.pending=[];document.exitPointerLock();this.callbacks.pickup('');for(const a of this.avatars.values())a.visible=false;for(const g of this.grenadeMeshes.values())disposeGroup(g);this.grenadeMeshes.clear();}
   lock(){if(this.active){void this.canvas.requestPointerLock();this.audio.unlock();}}
   setEffects(on:boolean){this.audio.setEnabled(on);}
   update(s:Snapshot){
@@ -71,7 +71,7 @@ export class Arena {
     const fresh=!old||old.hp<=0&&me.hp>0||oldRound!==s.round||Math.hypot(old.x-me.x,old.z-me.z)>10;
     if(oldRound!==undefined&&oldRound!==s.round){this.blastShake.strength=0;this.audio.stopCombat();this.audio.stopExplosions();this.explosions.clear();}
     if(fresh){this.yaw=me.yaw;this.pitch=me.pitch;this.weapon=me.weapon;this.pending=[];this.localSteps.reset();}
-    if(this.weapon==='bomb'&&s.bomb?.carrierId!==me.id){this.weapon=me.weapon==='bomb'?me.primary:me.weapon;this.fire=false;}
+    if(this.weapon==='bomb'&&!s.bombs.some(b=>b.carrierId===me.id)){this.weapon=me.weapon==='bomb'?me.primary:me.weapon;this.fire=false;}
     if(old&&old.primary!==me.primary)this.weapon=me.weapon;
     this.seq=Math.max(this.seq,me.ack);this.pending=this.pending.filter(i=>i.seq>me.ack);this.predicted={x:me.x,y:me.y,z:me.z,vy:me.vy,grounded:me.grounded,crouched:me.crouched};
     if(me.hp>0)for(const i of this.pending)this.predicted=move(this.predicted,i,MAPS[this.mapId].solids);
@@ -87,7 +87,7 @@ export class Arena {
     if(e.type==='damage'&&e.target===this.id){this.hurtUntil=performance.now()+300;this.audio.hurt();const angle=Math.atan2(e.from.x-this.predicted.x,-(e.from.z-this.predicted.z))+this.yaw;this.callbacks.damage(angle);return;}
     if(e.type==='reload'){if(isGun(e.weapon))this.audio.reload(e.weapon,e.shooter,where,occluded);return;}
     if(e.type==='bombAction'){this.audio.bombAction(where);return;}
-    if(e.type==='bombPlant'){this.audio.bombPlanted(e.from);this.lastBombBeep=0;return;}
+    if(e.type==='bombPlant'){this.audio.bombPlanted(e.from);this.lastBombBeeps.clear();return;}
     if(e.type==='bombDefuse'){this.audio.bombDefused();return;}
     if(e.type==='pickup'){if(mine)this.audio.pickup();return;}
     if(e.type==='melee'){this.audio.knife(where,occluded,e.target?'player':Math.hypot(e.to.x-e.from.x,e.to.y-e.from.y,e.to.z-e.from.z)<1.75?'wall':'air');if(mine)this.swingUntil=performance.now()+300;return;}
@@ -132,14 +132,22 @@ export class Arena {
       const moving=this.keys.has('KeyW')||this.keys.has('KeyA')||this.keys.has('KeyS')||this.keys.has('KeyD');
       if(me&&me.hp>0&&me.hp<=30&&now-this.lastBeat>1150){this.audio.heartbeat();this.lastBeat=now;}
       this.gun.visible=!!me?.hp&&this.snap.phase==='playing'&&!(this.weapon==='grenade'&&me.grenades===0);this.setGun(this.weapon);this.recoil=Math.max(0,this.recoil-dt*.38);this.gun.position.z=-.56+this.recoil;const swing=this.weapon==='knife'?Math.sin(Math.PI*Math.max(0,(this.swingUntil-now)/300)):0;this.gun.rotation.x=THREE.MathUtils.lerp(this.gun.rotation.x,me?.reloadUntil?-.65:-swing*.9,Math.min(1,dt*8));this.gun.rotation.z=THREE.MathUtils.lerp(this.gun.rotation.z,me?.reloadUntil?-.25:-swing*.7,Math.min(1,dt*8));this.gun.position.y=-.28+(!this.reduceMotion&&moving?Math.sin(now*.013)*.007:0);this.flash.visible=isGun(this.weapon)&&now<this.flashUntil;
-      const available=me&&me.hp?nearestPickup(me,this.snap.pickups,this.snap.time,solids):undefined;const bomb=this.snap.bomb;let label=available?`E · PICK UP ${weaponLabel(available.weapon)}`:'';if(me?.hp&&bomb){if(bomb.status==='dropped'&&me.team==='red'&&canReachBomb(me,bomb,solids))label='E · RECOVER C4';else if(bomb.status==='planted'&&me.team==='blue'&&canReachBomb(me,bomb,solids))label='HOLD E · DEFUSE C4';else if(bomb.carrierId===me.id&&plantSite(me,this.mapId))label=this.weapon==='bomb'?'HOLD LEFT CLICK · PLANT C4':'5 · SELECT C4 TO PLANT';}if(label!==this.prompt){this.prompt=label;this.callbacks.pickup(label);}
-      if(bomb){
-        if(!this.bombMesh){this.bombMesh=this.art.weapon('bomb',false);this.scene.add(this.bombMesh);}
-        this.bombMesh.visible=bomb.status==='dropped'||bomb.status==='planted';this.bombMesh.position.set(bomb.x,bomb.y+.12,bomb.z);
-        const left=bomb.explodeAt-this.snap.time-(now-(this.snapshots.at(-1)?.received??now));
-        if(bomb.status==='planted'&&left>0&&now-this.lastBombBeep>Math.max(120,left/40000*1000)){this.audio.bombBeep(bomb);this.lastBombBeep=now;}
-        const light=this.bombMesh.getObjectByName('bombLight');if(light)light.visible=bomb.status==='planted'&&now-this.lastBombBeep<100;
-      }else if(this.bombMesh)this.bombMesh.visible=false;
+      const available=me&&me.hp?nearestPickup(me,this.snap.pickups,this.snap.time,solids):undefined;
+      const ownBomb=this.snap.bombs.find(b=>b.team===me?.team),enemyBomb=this.snap.bombs.find(b=>b.team!==me?.team);
+      let label=available?`E · PICK UP ${weaponLabel(available.weapon)}`:'';
+      if(me?.hp){
+        if(ownBomb?.status==='dropped'&&canReachBomb(me,ownBomb,solids))label='E · RECOVER YOUR C4';
+        else if(ownBomb?.carrierId===me.id&&plantSite(me,this.mapId,me.team))label=this.weapon==='bomb'?'HOLD LEFT CLICK · PLANT C4':'5 · SELECT C4 TO PLANT';
+        if(enemyBomb?.status==='planted'&&canReachBomb(me,enemyBomb,solids))label='HOLD E · DEFUSE ENEMY C4';
+      }
+      if(label!==this.prompt){this.prompt=label;this.callbacks.pickup(label);}
+      for(const bomb of this.snap.bombs){
+        let mesh=this.bombMeshes.get(bomb.team);if(!mesh){mesh=this.art.weapon('bomb',false);this.scene.add(mesh);this.bombMeshes.set(bomb.team,mesh);}
+        mesh.visible=bomb.status==='dropped'||bomb.status==='planted';mesh.position.set(bomb.x,bomb.y+.12,bomb.z);
+        const left=bomb.explodeAt-this.snap.time-(now-(this.snapshots.at(-1)?.received??now)),last=this.lastBombBeeps.get(bomb.team)??0;
+        if(bomb.status==='planted'&&left>0&&now-last>Math.max(120,left/40000*1000)){this.audio.bombBeep(bomb);this.lastBombBeeps.set(bomb.team,now);}
+        const light=mesh.getObjectByName('bombLight');if(light)light.visible=bomb.status==='planted'&&now-(this.lastBombBeeps.get(bomb.team)??0)<100;
+      }
       const renderTime=now-100;let a=this.snapshots[0],b=this.snapshots.at(-1)!;for(let j=1;j<this.snapshots.length;j++)if(this.snapshots[j].received>=renderTime){a=this.snapshots[j-1];b=this.snapshots[j];break;}const t=a&&b?THREE.MathUtils.clamp((renderTime-a.received)/Math.max(1,b.received-a.received),0,1):1;
       for(const p of this.snap.players){if(p.id===this.id)continue;const avatar=this.avatar(p);avatar.visible=p.hp>0;const previous=a?.state.players.find(q=>q.id===p.id)??p,next=b?.state.players.find(q=>q.id===p.id)??p;avatar.position.set(THREE.MathUtils.lerp(previous.x,next.x,t),THREE.MathUtils.lerp(previous.y,next.y,t),THREE.MathUtils.lerp(previous.z,next.z,t));avatar.rotation.y=next.yaw;avatar.scale.y=THREE.MathUtils.lerp(avatar.scale.y,p.crouched?.61:1,Math.min(1,dt*12));const walking=Math.hypot(next.x-previous.x,next.z-previous.z)>.025;for(const [i,name] of ['leftLeg','rightLeg'].entries()){const leg=avatar.getObjectByName(name);if(leg)leg.rotation.x=walking?Math.sin(now*.014+i*Math.PI)*.32:0;}}
       for(const [id,g] of this.avatars)if(!this.snap.players.some(p=>p.id===id)){disposeGroup(g);this.avatars.delete(id);this.remoteStep.delete(id);}
@@ -152,7 +160,7 @@ export class Arena {
     this.explosions.update(now);
     this.renderer.render(this.scene,this.camera);this.raf=requestAnimationFrame(this.frame);
   };
-  private keydown=(e:KeyboardEvent)=>{if(!this.active||e.target instanceof HTMLInputElement)return;if(['Tab','Space','KeyW','KeyA','KeyS','KeyD','ShiftLeft','ControlLeft','ControlRight','KeyC','KeyR','KeyE','Digit1','Digit2','Digit3','Digit4','Digit5'].includes(e.code))e.preventDefault();this.keys.add(e.code);if(e.code==='Tab')this.callbacks.board(true);if(document.pointerLockElement!==this.canvas)return;if(e.code==='Space'&&!e.repeat)this.jump=true;if(e.code==='KeyR'&&!e.repeat)this.reload=true;if(e.code==='KeyE'&&!e.repeat)this.interact=true;if(e.code==='Digit1')this.weapon='knife';if(e.code==='Digit2')this.weapon=this.snap?.players.find(p=>p.id===this.id)?.primary??'rifle';if(e.code==='Digit3')this.weapon='pistol';if(e.code==='Digit4')this.weapon='grenade';if(e.code==='Digit5'&&this.snap?.bomb?.carrierId===this.id)this.weapon='bomb';};
+  private keydown=(e:KeyboardEvent)=>{if(!this.active||e.target instanceof HTMLInputElement)return;if(['Tab','Space','KeyW','KeyA','KeyS','KeyD','ShiftLeft','ControlLeft','ControlRight','KeyC','KeyR','KeyE','Digit1','Digit2','Digit3','Digit4','Digit5'].includes(e.code))e.preventDefault();this.keys.add(e.code);if(e.code==='Tab')this.callbacks.board(true);if(document.pointerLockElement!==this.canvas)return;if(e.code==='Space'&&!e.repeat)this.jump=true;if(e.code==='KeyR'&&!e.repeat)this.reload=true;if(e.code==='KeyE'&&!e.repeat)this.interact=true;if(e.code==='Digit1')this.weapon='knife';if(e.code==='Digit2')this.weapon=this.snap?.players.find(p=>p.id===this.id)?.primary??'rifle';if(e.code==='Digit3')this.weapon='pistol';if(e.code==='Digit4')this.weapon='grenade';if(e.code==='Digit5'&&this.snap?.bombs.some(b=>b.carrierId===this.id))this.weapon='bomb';};
   private keyup=(e:KeyboardEvent)=>{this.keys.delete(e.code);if(e.code==='Tab')this.callbacks.board(false);};
   private mousemove=(e:MouseEvent)=>{if(document.pointerLockElement!==this.canvas)return;this.yaw=(this.yaw-e.movementX*.002+Math.PI*3)%(Math.PI*2)-Math.PI;this.pitch=THREE.MathUtils.clamp(this.pitch-e.movementY*.002,-1.5,1.5);};
   private mousedown=(e:MouseEvent)=>{if(e.button===0&&document.pointerLockElement===this.canvas)this.fire=true;};

@@ -18,7 +18,7 @@ Long and its vestibule, Pit, A platform, Goose area, Short/Catwalk over the CT p
 
 ## Validation
 
-Six complete movement routes and ten former drop pockets are tested in both directions with actual movement integration. A directed surface-grid audit checks that sampled reachable positions have return paths. Rendered floors are clipped into a union so covered faces are removed, and 2,000 sampled rays check that visible tops agree with collision heights without duplicate faces. Tests also cover clear spawn/pickup positions, slope landing, stable ramp/landing seams, concave wall collisions, and passing above/below Short. The multiplayer suite exercises eight WebSocket clients, combat, respawn, reconnect and room recreation.
+Six complete movement routes and ten former drop pockets are tested in both directions with actual movement integration. A directed surface-grid audit checks that sampled reachable positions have return paths. Rendered floors are clipped into a union so covered faces are removed, and 2,000 sampled rays check that visible tops agree with collision heights without duplicate faces. Tests also cover clear spawn/pickup positions, slope landing, stable ramp/landing seams, concave wall collisions, and passing above/below Short. Jump traversal tests cover low boxes, vehicle hoods/cabins, the B-window boost, CT boost steps, nearby cover leading to tall site stacks, and the new blue-container step. Vehicle collision follows the visible hood, cabin and truck bed; a normal jump rises about 1.69 m. The multiplayer suite exercises eight WebSocket clients, combat, respawn, reconnect and room recreation.
 
 ## Fidelity limits
 

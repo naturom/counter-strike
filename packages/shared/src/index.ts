@@ -8,8 +8,9 @@ export const isGun = (weapon:Equipment):weapon is Weapon => weapon!=='knife'&&we
 export type GameMode='deathmatch'|'defusal';
 export const validMode=(value:unknown):value is GameMode=>value==='deathmatch'||value==='defusal';
 export const BOMB_RULES={plantMs:3200,fuseMs:40000,defuseMs:10000,roundMs:115000,range:2.2} as const;
-export interface BombSite {id:'A'|'B';x:number;z:number;w:number;d:number;minY:number;maxY:number;}
-export interface BombState extends Vec3 {status:'carried'|'dropped'|'planted'|'defused'|'exploded';carrierId:string|null;siteId:'A'|'B'|null;explodeAt:number;action:{kind:'plant'|'defuse';playerId:string;startedAt:number;completeAt:number}|null;}
+export interface BombSite {id:'A'|'B';x:number;z:number;w:number;d:number;minY:number;maxY:number;marker:Vec3&{size:number};}
+export const BOMB_TARGET:Record<Team,'A'|'B'>={red:'A',blue:'B'};
+export interface BombState extends Vec3 {team:Team;status:'carried'|'dropped'|'planted'|'defused'|'exploded';carrierId:string|null;siteId:'A'|'B'|null;explodeAt:number;action:{kind:'plant'|'defuse';playerId:string;startedAt:number;completeAt:number}|null;}
 export type MapId = 'dunes' | 'relay';
 export type Vec3 = { x: number; y: number; z: number };
 export const TICK_RATE = 30, DT = 1 / TICK_RATE, SNAPSHOT_RATE = 20;
@@ -22,7 +23,7 @@ export const WEAPONS = {
   marksman: { damage: 70, interval: 650, magazine: 8, reload: 2400, label: 'DMR-8', automatic: false },
 } as const;
 export const weaponLabel = (weapon: Equipment) => weapon === 'bomb' ? 'C4' : weapon === 'knife' ? 'KNIFE' : weapon === 'grenade' ? 'FRAG' : WEAPONS[weapon].label;
-export type Solid = { x: number; y: number; z: number; w: number; h: number; d: number; kind: 'wall' | 'crate' | 'roof' | 'floor'; polygon?: [number,number][]; ramp?: {axis:'x'|'z';from:number;to:number}; style?: 'plaster'|'kasbah'|'stone'|'road'|'tile'|'door'|'metal'; label?:string };
+export type Solid = { x: number; y: number; z: number; w: number; h: number; d: number; kind: 'wall' | 'crate' | 'roof' | 'floor'; polygon?: [number,number][]; ramp?: {axis:'x'|'z';from:number;to:number}; style?: 'plaster'|'kasbah'|'stone'|'road'|'tile'|'door'|'metal'; label?:string;vehicle?:{part:'body'|'cabin'|'cargo';height:number;truck:boolean} };
 const block = (x: number, z: number, w: number, d: number, h = 5, kind: Solid['kind'] = 'wall', y = h / 2): Solid => ({ x, y, z, w, h, d, kind });
 // Original "Relay" arena: offset courtyards around a central open route,
 // a covered west passage and an eastern switchback. Metres, Y up.
@@ -61,7 +62,7 @@ export const neutralInput=():Input=>({seq:0,forward:0,strafe:0,yaw:0,pitch:0,jum
 export interface Motion extends Vec3 {vy:number;grounded:boolean;crouched?:boolean;}
 export interface Player extends Motion {id:string;name:string;team:Team;yaw:number;pitch:number;hp:number;kills:number;deaths:number;weapon:Equipment;primary:Weapon;ammo:Record<Weapon,number>;grenades:number;crouched:boolean;reloadUntil:number;respawnAt:number;protectedUntil:number;connected:boolean;ack:number;}
 export interface Grenade extends Vec3 {id:number;owner:string;team:Team;vx:number;vy:number;vz:number;explodeAt:number;}
-export interface Snapshot {mode:GameMode;bomb:BombState|null;roundLive:boolean;outcome:string;mapId:MapId;matchId:string;round:number;time:number;endsAt:number;phase:'playing'|'finished';winner:Team|'draw'|null;scores:Record<Team,number>;players:Player[];pickups:Pickup[];grenades:Grenade[];}
+export interface Snapshot {mode:GameMode;bomb:BombState|null;bombs:BombState[];roundLive:boolean;outcome:string;mapId:MapId;matchId:string;round:number;time:number;endsAt:number;phase:'playing'|'finished';winner:Team|'draw'|null;scores:Record<Team,number>;players:Player[];pickups:Pickup[];grenades:Grenade[];}
 export interface CombatEvent {type:'shot'|'melee'|'kill'|'damage'|'reload'|'pickup'|'grenade'|'explosion'|'bombPlant'|'bombDefuse'|'bombAction';id:number;shooter:string;target?:string;name?:string;victim?:string;team:Team;weapon:Equipment;from:Vec3;to:Vec3;damage?:number;hp?:number;}
 export function validInput(value:unknown):value is Input {
   if(!value||typeof value!=='object')return false;const i=value as Input;
@@ -111,7 +112,7 @@ export function move(p:Motion,i:Input,solids:Solid[]=SOLIDS):Motion {
       out[axis]=before+delta*lo;
     }
   }
-  if(i.jump&&out.grounded&&!out.crouched){out.vy=8.4;out.grounded=false;}
+  if(i.jump&&out.grounded&&!out.crouched){out.vy=9.4;out.grounded=false;}
   const oldY=out.y;out.vy-=24*DT;const dy=out.vy*DT;out.y+=dy;out.grounded=false;
   // Resolve all intersecting surfaces together, independent of declaration order.
   let landing=0,ceiling=Infinity;
@@ -156,7 +157,7 @@ export function nearestPickup(p:Vec3,pickups:Pickup[],time:number,solids:Solid[]
   return pickups.filter(g=>g.availableAt<=time&&Math.hypot(g.x-p.x,g.z-p.z)<1.8&&Math.abs(g.y-p.y)<1).sort((a,b)=>Math.hypot(a.x-p.x,a.z-p.z)-Math.hypot(b.x-p.x,b.z-p.z)).find(g=>{const d={x:g.x-p.x,y:0,z:g.z-p.z},len=Math.hypot(d.x,d.z);return len<.01||wallDistance({x:p.x,y:p.y+.6,z:p.z},{x:d.x/len,y:0,z:d.z/len},solids)>=len-.05;});
 }
 
-export function plantSite(p:Vec3,mapId:MapId){return MAPS[mapId].bombSites?.find(s=>Math.abs(p.x-s.x)<=s.w/2&&Math.abs(p.z-s.z)<=s.d/2&&p.y>=s.minY&&p.y<=s.maxY);}
+export function plantSite(p:Vec3,mapId:MapId,team?:Team){return MAPS[mapId].bombSites?.find(s=>(!team||s.id===BOMB_TARGET[team])&&Math.abs(p.x-s.x)<=s.w/2&&Math.abs(p.z-s.z)<=s.d/2&&p.y>=s.minY&&p.y<=s.maxY);}
 export function canReachBomb(p:Vec3,bomb:Vec3,solids:Solid[]){
   const from={x:p.x,y:p.y+.9,z:p.z},to={x:bomb.x,y:bomb.y+.15,z:bomb.z},dx=to.x-from.x,dy=to.y-from.y,dz=to.z-from.z,d=Math.hypot(dx,dy,dz);
   return d<=BOMB_RULES.range&&(d<.01||wallDistance(from,{x:dx/d,y:dy/d,z:dz/d},solids)>=d-.03);

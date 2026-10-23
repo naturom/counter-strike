@@ -12,7 +12,7 @@ export class Simulation {
   events:CombatEvent[]=[];
   scores={red:0,blue:0};
   time=0;endsAt=ROUND_MS;phase:Snapshot['phase']='playing';winner:Snapshot['winner']=null;
-  bomb:BombState|null=null;outcome='';roundLive=false;
+  bombs:BombState[]=[];get bomb(){return this.bombs[0]??null;}outcome='';roundLive=false;
   private bombIntents=new Map<string,{input:Input;at:number}>();
   round=1;readonly matchId=randomUUID();
   readonly mapId:MapId;
@@ -23,7 +23,7 @@ export class Simulation {
     const red=[...this.players.values()].filter(p=>p.team==='red').length,blue=this.players.size-red;
     const team:Team=red<=blue?'red':'blue';
     const p:Player={id,name,team,x:0,y:0,z:0,vy:0,grounded:true,crouched:false,yaw:team==='red'?0:Math.PI,pitch:0,hp:100,kills:0,deaths:0,weapon:'rifle',primary:'rifle',ammo:freshAmmo(),grenades:2,reloadUntil:0,respawnAt:0,protectedUntil:0,connected:true,ack:0};
-    this.players.set(id,p);this.queues.set(id,[]);this.spawn(p);if(this.mode==='defusal'){if(this.roundLive){p.hp=0;p.respawnAt=0;}else if(team==='red'&&this.bomb?.status==='dropped'&&!this.bomb.carrierId){this.bomb.status='carried';this.bomb.carrierId=id;}}return p;
+    this.players.set(id,p);this.queues.set(id,[]);this.spawn(p);if(this.mode==='defusal'){if(this.roundLive){p.hp=0;p.respawnAt=0;}else{const bomb=this.bombs.find(b=>b.team===team);if(bomb?.status==='dropped'&&!bomb.carrierId){bomb.status='carried';bomb.carrierId=id;}}}return p;
   }
   remove(id:string){this.dropBomb(id);this.bombIntents.delete(id);this.players.delete(id);this.queues.delete(id);this.lastSeq.delete(id);this.nextShot.delete(id);this.trigger.delete(id);this.actions.delete(id);}
   input(id:string,i:Input){const prev=this.lastSeq.get(id)??0;if(i.seq<=prev||i.seq-prev>120)return;this.lastSeq.set(id,i.seq);const q=this.queues.get(id);if(!q)return;if(q.length>=8)q.shift();q.push(i);}
@@ -35,8 +35,8 @@ export class Simulation {
   }
   step(){
     this.time+=DT*1000;this.events=[];if(this.phase==='finished')return;
-    if(this.mode==='defusal'){if(!this.roundLive&&['red','blue'].every(team=>[...this.players.values()].some(p=>p.team===team&&p.connected&&p.hp>0)))this.roundLive=true;if(!this.roundLive&&this.bomb?.status!=='planted')this.endsAt+=DT*1000;}
-    if(this.time>=this.endsAt&&this.bomb?.status!=='planted'){if(this.mode==='defusal')this.finishBomb('blue','Time expired before planting');else this.finish();return;}
+    if(this.mode==='defusal'){if(!this.roundLive&&['red','blue'].every(team=>[...this.players.values()].some(p=>p.team===team&&p.connected&&p.hp>0)))this.roundLive=true;if(!this.roundLive&&!this.bombs.some(b=>b.status==='planted'))this.endsAt+=DT*1000;}
+    if(this.time>=this.endsAt&&!this.bombs.some(b=>b.status==='planted')){if(this.mode==='defusal')this.finishBomb('draw','Time expired without a detonation');else this.finish();return;}
     for(const p of this.players.values()){
       if(this.winner!==null)break;
       if(p.hp<=0){if((this.mode==='deathmatch'||!this.roundLive)&&this.time>=p.respawnAt)this.spawn(p);continue;}
@@ -47,12 +47,13 @@ export class Simulation {
       if(!i||!p.connected)continue;
       this.bombIntents.set(p.id,{input:i,at:this.time});
       p.ack=i.seq;p.yaw=i.yaw;p.pitch=i.pitch;
-      if(i.weapon!==p.weapon&&(i.weapon===p.primary||i.weapon==='pistol'||i.weapon==='knife'||i.weapon==='grenade'||i.weapon==='bomb'&&this.bomb?.carrierId===p.id&&this.bomb.status==='carried')){p.weapon=i.weapon;p.reloadUntil=0;this.nextShot.set(p.id,Math.max(this.nextShot.get(p.id)??0,this.time+(isGun(p.weapon)?200:0)));}
+      const ownBomb=this.bombs.find(b=>b.team===p.team),enemyBomb=this.bombs.find(b=>b.team!==p.team);
+      if(i.weapon!==p.weapon&&(i.weapon===p.primary||i.weapon==='pistol'||i.weapon==='knife'||i.weapon==='grenade'||i.weapon==='bomb'&&ownBomb?.carrierId===p.id&&ownBomb.status==='carried')){p.weapon=i.weapon;p.reloadUntil=0;this.nextShot.set(p.id,Math.max(this.nextShot.get(p.id)??0,this.time+(isGun(p.weapon)?200:0)));}
       const action=this.actions.get(p.id)!;
-      if(i.interact&&!action.interact){if(this.bomb?.status==='dropped'&&p.team==='red'&&canReachBomb(p,this.bomb,this.solids)){this.bomb.status='carried';this.bomb.carrierId=p.id;this.emit('pickup',p,'bomb',p,p);}else if(!(this.bomb?.status==='planted'&&p.team==='blue'&&canReachBomb(p,this.bomb,this.solids)))this.pickup(p);}
+      if(i.interact&&!action.interact){if(ownBomb?.status==='dropped'&&canReachBomb(p,ownBomb,this.solids)){ownBomb.status='carried';ownBomb.carrierId=p.id;this.emit('pickup',p,'bomb',p,p);}else if(!(enemyBomb?.status==='planted'&&canReachBomb(p,enemyBomb,this.solids)))this.pickup(p);}
       action.interact=!!i.interact;
       const was=this.trigger.get(p.id)??false;
-      if(p.weapon==='bomb'||i.weapon==='bomb'||this.bomb?.status==='planted'&&p.team==='blue'&&i.interact&&canReachBomb(p,this.bomb,this.solids)){p.reloadUntil=0;this.trigger.set(p.id,i.fire);continue;}
+      if(p.weapon==='bomb'||i.weapon==='bomb'||enemyBomb?.status==='planted'&&i.interact&&canReachBomb(p,enemyBomb,this.solids)){p.reloadUntil=0;this.trigger.set(p.id,i.fire);continue;}
       if(p.weapon==='grenade'){
         if(i.fire&&!was&&this.time>=action.throwAt&&p.grenades>0){this.throwGrenade(p);action.throwAt=this.time+600;}
       }else if(p.weapon==='knife'){
@@ -65,7 +66,7 @@ export class Simulation {
       this.trigger.set(p.id,i.fire);
     }
     if(this.phase==='playing')this.stepGrenades();
-    if(this.phase==='playing'&&this.bomb)this.stepBomb();
+    if(this.phase==='playing'&&this.bombs.length)this.stepBomb();
   }
   private eye(p:Player):Vec3{return{x:p.x,y:p.y+eyeOf(p),z:p.z};}
   private emit(type:CombatEvent['type'],p:{id:string;team:Team},weapon:Equipment,from:Vec3,to:Vec3,extra:Partial<CombatEvent>={}){this.events.push({type,id:++this.eventId,shooter:p.id,team:p.team,weapon,from:{...from},to:{...to},...extra});}
@@ -128,51 +129,59 @@ export class Simulation {
   }
   disconnect(id:string){const p=this.players.get(id);if(p)p.connected=false;this.dropBomb(id);this.bombIntents.delete(id);}
   private resetBomb(){
-    const carrier=[...this.players.values()].find(p=>p.team==='red'&&p.connected&&p.hp>0);
-    this.bomb={...MAPS[this.mapId].spawns.red[0],status:carrier?'carried':'dropped',carrierId:carrier?.id??null,siteId:null,explodeAt:0,action:null};
+    this.bombs=(['red','blue'] as Team[]).map(team=>{
+      const carrier=[...this.players.values()].find(p=>p.team===team&&p.connected&&p.hp>0);
+      return {...MAPS[this.mapId].spawns[team][0],team,status:carrier?'carried':'dropped',carrierId:carrier?.id??null,siteId:null,explodeAt:0,action:null};
+    });
   }
   private dropBomb(id:string){
-    if(!this.bomb||this.bomb.status!=='carried'||this.bomb.carrierId!==id)return;
-    const p=this.players.get(id);if(p){let y=0;for(const b of this.solids)if(footprint(p,b,0)&&solidTop(b,p)<=p.y+.01)y=Math.max(y,solidTop(b,p));Object.assign(this.bomb,{x:p.x,y,z:p.z});if(p.weapon==='bomb')p.weapon=p.primary;}
-    this.bomb.status='dropped';this.bomb.carrierId=null;this.bomb.action=null;
+    const bomb=this.bombs.find(b=>b.status==='carried'&&b.carrierId===id);if(!bomb)return;
+    const p=this.players.get(id);if(p){let y=0;for(const b of this.solids)if(footprint(p,b,0)&&solidTop(b,p)<=p.y+.01)y=Math.max(y,solidTop(b,p));Object.assign(bomb,{x:p.x,y,z:p.z});if(p.weapon==='bomb')p.weapon=p.primary;}
+    bomb.status='dropped';bomb.carrierId=null;bomb.action=null;
   }
-  private finishBomb(winner:Team,outcome:string){this.phase='finished';this.winner=winner;this.outcome=outcome;this.scores[winner]=1;if(this.bomb)this.bomb.action=null;}
+  private finishBomb(winner:Team|'draw',outcome:string){this.phase='finished';this.winner=winner;this.outcome=outcome;if(winner!=='draw')this.scores[winner]=1;for(const bomb of this.bombs)bomb.action=null;}
   private stepBomb(){
-    const bomb=this.bomb!;
-    const carrier=bomb.carrierId?this.players.get(bomb.carrierId):undefined;
-    if(bomb.status==='carried'&&(!carrier||!carrier.connected||carrier.hp<=0))this.dropBomb(bomb.carrierId!);
-    if(bomb.status==='carried'&&carrier)Object.assign(bomb,{x:carrier.x,y:carrier.y,z:carrier.z});
-    // The fuse wins a tie with defuse completion; the round clock no longer
-    // applies after a completed plant. All progress uses fixed server time.
-    if(bomb.status==='planted'&&this.time+.001>=bomb.explodeAt){
-      bomb.status='exploded';this.emit('explosion',{id:'C4',team:'red'},'bomb',bomb,bomb);
-      for(const p of this.players.values())if(p.hp>0&&Math.hypot(p.x-bomb.x,p.y-bomb.y,p.z-bomb.z)<18){const hp=Math.max(0,p.hp-Math.round(500*(1-Math.hypot(p.x-bomb.x,p.y-bomb.y,p.z-bomb.z)/18)));this.emit('damage',{id:'C4',team:'red'},'bomb',bomb,p,{target:p.id,damage:p.hp-hp,hp});if(hp===0){p.deaths++;}p.hp=hp;}
-      this.finishBomb('red','C4 detonated');return;
+    // Resolve every fuse before actions, independent of team/player order. An
+    // exact simultaneous detonation is a draw; a fuse wins a defuse-time tie.
+    const due=this.bombs.filter(b=>b.status==='planted'&&this.time+.001>=b.explodeAt).sort((a,b)=>a.explodeAt-b.explodeAt);
+    if(due.length){
+      const first=due.filter(b=>Math.abs(b.explodeAt-due[0].explodeAt)<.001);
+      for(const bomb of first){bomb.status='exploded';this.emit('explosion',{id:`C4-${bomb.team}`,team:bomb.team},'bomb',bomb,bomb);
+        for(const p of this.players.values())if(p.hp>0&&Math.hypot(p.x-bomb.x,p.y-bomb.y,p.z-bomb.z)<18){const hp=Math.max(0,p.hp-Math.round(500*(1-Math.hypot(p.x-bomb.x,p.y-bomb.y,p.z-bomb.z)/18)));this.emit('damage',{id:`C4-${bomb.team}`,team:bomb.team},'bomb',bomb,p,{target:p.id,damage:p.hp-hp,hp});if(hp===0)p.deaths++;p.hp=hp;}
+      }
+      this.finishBomb(first.length>1?'draw':first[0].team,first.length>1?'Both sites detonated simultaneously':`${first[0].team.toUpperCase()} C4 detonated at ${first[0].siteId}`);return;
     }
-    const candidates=[...this.players.values()].filter(p=>{
-      const intent=this.bombIntents.get(p.id);if(!intent||this.time-intent.at>150||!p.connected||p.hp<=0||!p.grounded)return false;
-      const i=intent.input;if(i.forward||i.strafe||i.jump||i.reload)return false;
-      if(bomb.status==='carried')return p.team==='red'&&bomb.carrierId===p.id&&p.weapon==='bomb'&&i.weapon==='bomb'&&i.fire&&!!plantSite(p,this.mapId);
-      return bomb.status==='planted'&&p.team==='blue'&&i.interact&&!i.fire&&canReachBomb(p,bomb,this.solids);
-    });
-    const actor=candidates.find(p=>p.id===bomb.action?.playerId)??candidates[0];
-    if(!actor)bomb.action=null;
-    else{
-      const kind=bomb.status==='carried'?'plant':'defuse';
-      if(bomb.action?.playerId!==actor.id||bomb.action.kind!==kind){bomb.action={kind,playerId:actor.id,startedAt:this.time,completeAt:this.time+(kind==='plant'?BOMB_RULES.plantMs:BOMB_RULES.defuseMs)};this.emit('bombAction',actor,'bomb',actor,actor);}
-      if(this.time+.001>=bomb.action.completeAt){
-        if(kind==='plant'){
-          const site=plantSite(actor,this.mapId)!;Object.assign(bomb,{status:'planted',carrierId:null,siteId:site.id,x:actor.x,y:actor.y,z:actor.z,explodeAt:this.time+BOMB_RULES.fuseMs,action:null});actor.weapon=actor.primary;this.emit('bombPlant',actor,'bomb',bomb,bomb);
-        }else{bomb.status='defused';this.emit('bombDefuse',actor,'bomb',bomb,bomb);this.finishBomb('blue','C4 defused');return;}
+    for(const bomb of this.bombs){
+      const carrier=bomb.carrierId?this.players.get(bomb.carrierId):undefined;
+      if(bomb.status==='carried'&&(!carrier||!carrier.connected||carrier.hp<=0))this.dropBomb(bomb.carrierId!);
+      if(bomb.status==='carried'&&carrier)Object.assign(bomb,{x:carrier.x,y:carrier.y,z:carrier.z});
+      const candidates=[...this.players.values()].filter(p=>{
+        const intent=this.bombIntents.get(p.id);if(!intent||this.time-intent.at>150||!p.connected||p.hp<=0||!p.grounded)return false;
+        const i=intent.input;if(i.forward||i.strafe||i.jump||i.reload)return false;
+        if(bomb.status==='carried')return p.team===bomb.team&&bomb.carrierId===p.id&&p.weapon==='bomb'&&i.weapon==='bomb'&&i.fire&&!!plantSite(p,this.mapId,p.team);
+        return bomb.status==='planted'&&p.team!==bomb.team&&i.interact&&!i.fire&&canReachBomb(p,bomb,this.solids);
+      });
+      const actor=candidates.find(p=>p.id===bomb.action?.playerId)??candidates[0];
+      if(!actor)bomb.action=null;
+      else{
+        const kind=bomb.status==='carried'?'plant':'defuse';
+        if(bomb.action?.playerId!==actor.id||bomb.action.kind!==kind){bomb.action={kind,playerId:actor.id,startedAt:this.time,completeAt:this.time+(kind==='plant'?BOMB_RULES.plantMs:BOMB_RULES.defuseMs)};this.emit('bombAction',actor,'bomb',actor,actor);}
+        if(this.time+.001>=bomb.action.completeAt){
+          if(kind==='plant'){const site=plantSite(actor,this.mapId,actor.team)!;Object.assign(bomb,{status:'planted',carrierId:null,siteId:site.id,x:actor.x,y:actor.y,z:actor.z,explodeAt:this.time+BOMB_RULES.fuseMs,action:null});actor.weapon=actor.primary;this.emit('bombPlant',actor,'bomb',bomb,bomb);}
+          else{bomb.status='defused';bomb.action=null;this.emit('bombDefuse',actor,'bomb',bomb,bomb);}
+        }
       }
     }
+    if(this.bombs.every(b=>b.status==='defused')){this.finishBomb('draw','Both C4 charges defused');return;}
     if(this.roundLive){
       const alive=(team:Team)=>[...this.players.values()].some(p=>p.team===team&&p.hp>0&&p.connected);
-      if(!alive('red')&&bomb.status!=='planted')this.finishBomb('blue','Attackers eliminated');
-      else if(!alive('blue'))this.finishBomb('red','Defenders eliminated');
+      const red=alive('red'),blue=alive('blue');
+      if(!red&&!blue&&!this.bombs.some(b=>b.status==='planted'))this.finishBomb('draw','Both teams eliminated');
+      else if(!red&&blue&&!this.bombs.some(b=>b.team==='red'&&b.status==='planted'))this.finishBomb('blue','RED eliminated');
+      else if(!blue&&red&&!this.bombs.some(b=>b.team==='blue'&&b.status==='planted'))this.finishBomb('red','BLUE eliminated');
     }
   }
   finish(){this.phase='finished';this.winner=this.scores.red===this.scores.blue?'draw':this.scores.red>this.scores.blue?'red':'blue';}
   rematch(){if(this.phase!=='finished')return;this.round++;this.scores={red:0,blue:0};this.phase='playing';this.winner=null;this.endsAt=this.time+(this.mode==='defusal'?BOMB_RULES.roundMs:ROUND_MS);this.roundLive=false;this.outcome='';this.bombIntents.clear();this.grenades=[];this.pickups=MAPS[this.mapId].pickups.map(p=>({...p}));for(const p of this.players.values()){p.kills=0;p.deaths=0;this.spawn(p);}if(this.mode==='defusal')this.resetBomb();}
-  snapshot():Snapshot{return{mode:this.mode,roundLive:this.roundLive,outcome:this.outcome,bomb:this.bomb?{...this.bomb,action:this.bomb.action?{...this.bomb.action}:null}:null,mapId:this.mapId,matchId:this.matchId,round:this.round,time:this.time,endsAt:this.endsAt,phase:this.phase,winner:this.winner,scores:{...this.scores},players:[...this.players.values()].map(p=>({...p,ammo:{...p.ammo}})),pickups:this.pickups.map(p=>({...p})),grenades:this.grenades.map(g=>({...g}))};}
+  snapshot():Snapshot{return{mode:this.mode,roundLive:this.roundLive,outcome:this.outcome,bomb:this.bomb?{...this.bomb,action:this.bomb.action?{...this.bomb.action}:null}:null,bombs:this.bombs.map(b=>({...b,action:b.action?{...b.action}:null})),mapId:this.mapId,matchId:this.matchId,round:this.round,time:this.time,endsAt:this.endsAt,phase:this.phase,winner:this.winner,scores:{...this.scores},players:[...this.players.values()].map(p=>({...p,ammo:{...p.ammo}})),pickups:this.pickups.map(p=>({...p})),grenades:this.grenades.map(g=>({...g}))};}
 }

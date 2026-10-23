@@ -81,3 +81,15 @@ test('Dust II sampled reachable surfaces all have a way back to the spawn networ
   assert.ok(reachable.size>10000,'audit must cover the playable network');
   assert.deepEqual(traps.map(({u,v,y})=>({u,v,y})),[]);
 });
+
+test('B doors and exterior render one continuous surface across both ramp edges',()=>{
+  const floors=DUST2.solids.filter(b=>b.kind==='floor'),material=new THREE.MeshBasicMaterial();
+  const meshes=floors.map(b=>new THREE.Mesh(visibleFloorGeometry(b,floors),material)),ray=new THREE.Raycaster();
+  for(let u=244.37;u<324;u+=2)for(let v=215.19;v<284;v+=2){
+    const p=dustPoint(u,v);ray.set(new THREE.Vector3(p.x,12,p.z),new THREE.Vector3(0,-1,0));
+    const hits=ray.intersectObjects(meshes,false);assert.ok(hits.length,`B floor hole at ${u},${v}`);
+    assert.ok(Math.abs(hits[0].point.y-groundAt(p,floors))<1e-4,`B ramp render/collision mismatch at ${u},${v}`);
+    for(let i=1;i<hits.length;i++)assert.ok(Math.abs(hits[i].point.y-hits[i-1].point.y)>1e-4,`B coplanar floor faces at ${u},${v}`);
+  }
+  meshes.forEach(m=>m.geometry.dispose());material.dispose();
+});

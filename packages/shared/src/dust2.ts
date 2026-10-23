@@ -25,18 +25,34 @@ function ramp(name:string,u:number,v:number,w:number,d:number,axis:'x'|'z',from:
 }
 function crate(name:string,u:number,v:number,w:number,d:number,h:number,base:number){return rect(name,u,v,w,d,h,base,'crate','stone');}
 
+// Vehicles expose a lower hood and a higher cabin instead of an invisible
+// full-height box over the whole footprint. Rendering uses the same dimensions.
+function vehicle(name:string,u:number,v:number,w:number,d:number,height:number,base:number,truck=false){
+  const body=rect(name,u,v,w,d,height*.925/1.5,base,'crate','metal');
+  body.vehicle={part:'body',height,truck};
+  const sideways=body.w>body.d,length=Math.max(body.w,body.d),width=Math.min(body.w,body.d),scale=height/1.5;
+  const part=(kind:'cabin'|'cargo',localZ:number,partWidth:number,partLength:number,top:number)=>{
+    const bottom=base+body.h;
+    solids.push({...body,label:`${name} ${kind}`,x:body.x+(sideways?localZ:0),z:body.z+(sideways?0:localZ),w:sideways?partLength:partWidth,d:sideways?partWidth:partLength,y:(bottom+base+top*scale)/2,h:base+top*scale-bottom,vehicle:{part:kind,height,truck}});
+  };
+  part('cabin',-.15,width*.85,length*.47,1.48);
+  if(truck)part('cargo',length*.25,width*.9,length*.45,1.45);
+}
+
 // Perimeter follows the radar silhouette rather than enclosing a generic rectangle.
 const boundary:[number,number][]=[[78,16],[136,16],[136,80],[790,80],[790,34],[925,34],[925,104],[932,104],[932,215],[970,215],[970,318],[947,318],[925,355],[925,496],[965,496],[965,668],[925,668],[925,790],[738,790],[738,822],[666,822],[666,964],[606,964],[606,1000],[488,1000],[488,977],[54,977],[54,880],[90,842],[90,616],[66,616],[66,180],[78,180]];
 boundary.forEach((p,i)=>wall('Perimeter',p,boundary[(i+1)%boundary.length],8+(i%4)*.65,0,p[0]<560?'kasbah':'plaster',7));
 
 // Large building footprints establish every route and the characteristic bends.
 poly('Northern kasbah',[[263,80],[790,80],[790,104],[618,104],[618,155],[574,155],[574,213],[488,213],[488,150],[320,150],[320,118],[263,118]],9,0,'kasbah');
-poly('B northern parapet',[[136,80],[263,80],[263,118],[136,118]],7,2,'kasbah');
-rect('B east wall north',254,118,9,71,6,2,'wall','kasbah');
-rect('B window sill',254,189,9,25,1.25,2,'wall','kasbah');
+// Retaining walls reach the lower CT ground; only the window aperture is open.
+// Starting these at the raised B floor left a crawlable void beneath the site.
+poly('B northern parapet',[[136,80],[263,80],[263,118],[136,118]],9,0,'kasbah');
+rect('B east wall north',254,118,9,71,8,0,'wall','kasbah');
+rect('B window sill',254,189,9,25,3.25,0,'wall','kasbah');
 rect('B window lintel',254,189,9,25,2.6,5.1,'wall','kasbah');
-rect('B east pier',254,214,9,18,6,2,'wall','kasbah');
-rect('B east wall south',254,268,9,57,6,2,'wall','kasbah');
+rect('B east pier',254,214,9,18,8,0,'wall','kasbah');
+rect('B east wall south',254,268,9,57,8,0,'wall','kasbah');
 wall('B exit angled wall',[254,325],[210,370],6,0);
 rect('B tunnel east',138,327,32,90,7.8,0,'wall','kasbah');
 rect('B tunnel west',66,327,32,87,7.8,0,'wall','kasbah');
@@ -72,7 +88,9 @@ floor('B plant platform',136,118,118,62,2.65);
 ramp('B platform ramp',136,180,45,32,'z',2.65,2);
 floor('B exit apron',170,327,116,43,2);
 ramp('B exit return',170,370,116,44,'z',2,3.2);
-ramp('B doors threshold',254,232,65,36,'x',2,0);
+// Cover both angled door leaves, including their outer edges, with one ramp.
+// The old narrow threshold left trenches alongside the approach.
+ramp('B doors threshold',254,220,65,58,'x',2,0);
 // The narrow lower tunnel flight drops toward Mid; the corridor stays under roof.
 ramp('Tunnel stairs',286,438,44,56,'z',.3,3.2);
 floor('Tunnel stair landing',286,494,44,8,3.2);
@@ -147,10 +165,11 @@ crate('A default',788,148,25,26,1.45,3.8);
 crate('A double stack',758,107,26,30,2.6,3.8);
 crate('A short cover',695,190,23,20,1.25,3.8);
 crate('T spawn cover',111,910,32,14,1.1,3.2);
+crate('Blue container step',704,482,19,21,1.2,2.1);
 rect('Blue container',723,462,54,25,2.5,2.1,'crate','metal');
-rect('Long car',923,263,20,45,1.5,2.1,'crate','metal');
-rect('B car',174,296,39,18,1.5,2,'crate','metal');
-rect('CT truck',429,148,57,23,2.1,0,'crate','metal');
+vehicle('Long car',923,263,20,45,1.5,2.1);
+vehicle('B car',174,296,39,18,1.5,2);
+vehicle('CT truck',429,148,57,23,2.1,0,true);
 
 const landmark = (name:string,u:number,v:number)=>({name,...dustPoint(u,v)});
 export const DUST2:MapDefinition={
@@ -158,6 +177,11 @@ export const DUST2:MapDefinition={
   bounds:{minX:-54,maxX:54,minZ:-57,maxZ:57},
   spawns:{red:[dustPoint(380,930,3.2),dustPoint(330,930,3.2),dustPoint(430,930,3.2),dustPoint(280,930,3.2)],blue:[dustPoint(590,225),dustPoint(590,190),dustPoint(563,225),dustPoint(590,260)]},
   pickups:[{id:'west-smg',...dustPoint(380,908,3.2),weapon:'smg',availableAt:0},{id:'east-smg',...dustPoint(590,247),weapon:'smg',availableAt:0},{id:'mid-dmr',...dustPoint(461,607,2.1*(607-438)/182),weapon:'marksman',availableAt:0},{id:'court-dmr',...dustPoint(115,453,3.2),weapon:'marksman',availableAt:0}],
-  bombSites:[{id:'A',...dustPoint(786,170),w:103*DUST_SCALE,d:68*DUST_SCALE,minY:3.7,maxY:3.9},{id:'B',...dustPoint(190,208),w:108*DUST_SCALE,d:116*DUST_SCALE,minY:1.9,maxY:2.75}],
+  // Marker placement and authoritative plant areas share this definition. B
+  // includes the entire raised platform as well as its courtyard approach.
+  bombSites:[
+    {id:'A',...dustPoint(786,170),w:103*DUST_SCALE,d:68*DUST_SCALE,minY:3.7,maxY:3.9,marker:{...dustPoint(813,174,3.8),size:3.6}},
+    {id:'B',...dustPoint(195,192),w:118*DUST_SCALE,d:148*DUST_SCALE,minY:1.9,maxY:2.75,marker:{...dustPoint(217,164,2.65),size:2.8}},
+  ],
   landmarks:[landmark('A',815,130),landmark('B',186,199),landmark('T SPAWN',377,939),landmark('CT SPAWN',590,222),landmark('LONG',879,423),landmark('PIT',885,626),landmark('MID',470,510),landmark('SHORT',646,310),landmark('TUNNELS',160,460)],
 };
