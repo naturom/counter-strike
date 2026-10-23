@@ -22,4 +22,4 @@ Six complete movement routes and ten former drop pockets are tested in both dire
 
 ## Fidelity limits
 
-This recreates the route structure and recognizable landmarks with procedural architecture and existing CC0 textures. It does not reproduce every Valve prop, material, clipping brush, grenade lineup, traversal timing or exact elevation. Stairs use smooth collision ramps. The game remains team deathmatch; A/B markings are landmarks, not a new bomb-defusal mode.
+This recreates the route structure and recognizable landmarks with procedural architecture and existing CC0 textures. It does not reproduce every Valve prop, material, clipping brush, grenade lineup, traversal timing or exact elevation. Stairs use smooth collision ramps. The map supports selectable Deathmatch and Bomb Defusal. A/B planting zones are defined in shared world coordinates and checked on the server; the original loadouts and manual round rematch remain.

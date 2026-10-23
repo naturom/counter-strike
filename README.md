@@ -4,7 +4,7 @@ An original desktop browser multiplayer FPS, implemented with Next.js, TypeScrip
 
 ## Play
 
-Choose a map, enter a guest callsign, create a room, and copy the invitation link to a friend. Invitations are carried in the URL fragment, so they are not sent in normal HTTP request URLs. Teams balance automatically, with four players per team and eight per room. A full room displays an explicit notice.
+Choose a map and game mode, enter a guest callsign, create a room, and copy the invitation link to a friend. Invitations are carried in the URL fragment, so they are not sent in normal HTTP request URLs. Teams balance automatically, with four players per team and eight per room. A full room displays an explicit notice.
 
 Click **Enter the arena** to capture your mouse. Escape releases it.
 
@@ -16,13 +16,18 @@ Click **Enter the arena** to capture your mouse. Escape releases it.
 | R | Reload |
 | 1 | Knife |
 | 2 / 3 | Equipped primary gun / pistol |
-| E | Pick up a nearby gun (replaces primary) |
+| E | Pick up a nearby gun or dropped C4; hold near planted C4 to defuse as blue |
 | 4, then left click | Select and throw a frag grenade |
+| 5, then hold left click | Select carried C4 and plant at A or B (Bomb Defusal) |
 | C / Ctrl | Hold to crouch |
 | Tab | Hold scoreboard |
 | Escape | Menu, invite, leave |
 
-Each round lasts ten minutes or ends at 30 kills. Players have 100 HP, respawn in three seconds, and cannot damage teammates. Respawns receive 1.5 seconds of protection, cancelled by firing or throwing a grenade. Rifle: 25 damage, 600 RPM, 30 rounds, 1.8-second reload. Pistol: 20 damage, maximum 300 RPM, 12 rounds, 1.2-second reload. Ammunition reserves are unlimited; magazines and reload times are enforced. Half the connected players must vote to start a rematch.
+Deathmatch rounds last ten minutes or end at 30 kills. Players have 100 HP, respawn in three seconds, and cannot damage teammates. Respawns receive 1.5 seconds of protection, cancelled by firing or throwing a grenade. Rifle: 25 damage, 600 RPM, 30 rounds, 1.8-second reload. Pistol: 20 damage, maximum 300 RPM, 12 rounds, 1.2-second reload. Ammunition reserves are unlimited; magazines and reload times are enforced. Half the connected players must vote to start a rematch.
+
+**Bomb Defusal (Dust II):** Red attacks the blue-defended A/B sites. One red player carries C4. Select it with **5** and hold left click at a site for **3.2 seconds**. After planting, a **40-second fuse** replaces the round clock. Blue holds **E** within reach and line of sight for **10 seconds** to defuse. Moving, jumping, releasing the button, switching away while planting, dying or disconnecting cancels progress. C4 drops on death/disconnect and red teammates can recover it with E. Beeps accelerate toward detonation, with a world device, radar marker, countdown and progress bar.
+
+Bomb rounds have a **1:55** pre-plant clock and one life once both teams are present. Eliminating attackers before the plant or running out the clock wins for blue; eliminating defenders or detonating C4 wins for red. Killing the last attacker after planting leaves the fuse active. New players joining an active round wait for the next round. Each round ends on the result screen; vote for a rematch to reset the round. While alone, players can explore and practise planting, and the pre-plant clock waits for an opponent. This mode uses the existing loadouts and a ten-second defuse; there is no buy economy or defuse-kit inventory.
 
 The knife deals 40 damage within 1.8 metres, with one slash per click and a half-second cooldown. Solid cover, friendly-fire rules and spawn protection apply. It uses no ammunition. Selecting a grenade does not throw it; left-click throws one, and an empty grenade slot shows zero remaining.
 
@@ -30,7 +35,7 @@ Weapon racks offer a 40-round SMG (17 damage, 900 RPM, 1.5-second reload) and an
 
 Crouching lowers your camera and hitbox and slows movement; standing is blocked under low cover. Incoming hits produce a directional red indicator, screen vignette, sound and brief camera jolt. Numeric health and a health bar show HP remaining; low health adds a pulse and heartbeat. Reduced-motion preferences suppress camera shake and weapon bob.
 
-Directional synthesized audio includes distinct gunshots, magazine/bolt reload sequences, quieter crouched footsteps, pickups, grenade throws, explosions and damage. Audio starts after clicking Enter/Explore and can be muted in the menu. Lighting, sky, shadows, textured surfaces, shutters, roof details, palms and background buildings improve the environment while keeping the rendering lightweight. These are stylized procedural models, not photorealistic scanned environments.
+Directional synthesized audio includes distinct gunshots, magazine/bolt reload sequences, quieter crouched footsteps, pickups, grenade throws, explosions and damage. Audio starts after clicking Enter/Explore and can be muted in the menu. Grenades have a sharp pressure crack, dust burst and roughly four seconds of smoke; C4 has a larger flash, debris, ten-second dust/smoke cloud and an 8.5-second rolling bass/reflection tail. Sound delay and high-frequency absorption follow distance, and cover muffles the blast. The C4 result screen waits 3.2 seconds so the blast remains visible. Effects are capped, cleaned up on rematch/exit, and flashes/shake respect reduced-motion preferences. Lighting, sky, shadows, textured surfaces, shutters, roof details, palms and background buildings improve the environment while keeping the rendering lightweight. These are stylized procedural models, not photorealistic scanned environments.
 
 ## Run locally
 

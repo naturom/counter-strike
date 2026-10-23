@@ -1,4 +1,4 @@
-import {DEFAULT_MAP,validMap} from '@sirocco/shared';
+import {DEFAULT_MAP,validMap,validMode} from '@sirocco/shared';
 import {createServer, type IncomingMessage, type ServerResponse} from 'node:http';
 import {randomBytes} from 'node:crypto';
 import {Server,matchMaker} from '@colyseus/core';
@@ -39,7 +39,8 @@ export async function createGameServer(options:{secret?:string;handler?:(req:Inc
         const body=JSON.parse(raw||'{}');
         if(typeof body.nickname!=='string'||!body.nickname.trim()||body.nickname.length>20){json(res,400,{error:'Enter a nickname (1–20 characters).'});return;}
         if(body.mapId!==undefined&&!validMap(body.mapId))throw new Error('Unknown map');
-        const invite=body.invite??signs.create(Date.now(),body.mapId??DEFAULT_MAP);const payload=signs.verify(invite);
+        if(body.mode!==undefined&&!validMode(body.mode))throw new Error('Unknown mode');
+        const invite=body.invite??signs.create(Date.now(),body.mapId??DEFAULT_MAP,body.mode??'deathmatch');const payload=signs.verify(invite);
         const result=await serial(payload.id,async()=>{
           let id=roomsByInvite.get(payload.id);let room=id?await matchMaker.query({roomId:id}):[];
           const fresh=!room.length;
@@ -50,7 +51,7 @@ export async function createGameServer(options:{secret?:string;handler?:(req:Inc
           const local=activeRooms.get(id!);
           if(local && local.sim.players.size>=8 || room[0].locked)throw Object.assign(new Error('Room full: all 8 seats are occupied or reconnecting.'),{status:409});
           const reservation=await matchMaker.reserveSeatFor(room[0],{invite,nickname:body.nickname});
-          return {invite,reservation,fresh,mapId:payload.mapId,matchId:local?.sim.matchId};
+          return {invite,reservation,fresh,mapId:payload.mapId,mode:payload.mode,matchId:local?.sim.matchId};
         });
         json(res,200,result);
       }catch(error){const e=error as Error & {status?:number};json(res,e.status??400,{error:e.message||'Unable to join room'});}

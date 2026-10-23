@@ -14,7 +14,7 @@ export class ArenaRoom extends Room {
   private idle=new Map<string,number>();
   private votes=new Set<string>();
   onCreate(options:{invite:string}) {
-    const invitation=inviteSigner.verify(options.invite);this.inviteId=invitation.id;this.sim=new Simulation(invitation.mapId!);
+    const invitation=inviteSigner.verify(options.invite);this.inviteId=invitation.id;this.sim=new Simulation(invitation.mapId!,invitation.mode);
     this.maxClients=8;
     this.seatReservationTimeout=20;
     this.setPatchRate(null);
@@ -51,7 +51,7 @@ export class ArenaRoom extends Room {
     log('player_joined',{room:this.roomId,players:this.sim.players.size});
   }
   onDrop(client:Client) {
-    const p=this.sim.players.get(client.sessionId);if(p)p.connected=false;
+    const p=this.sim.players.get(client.sessionId);if(p)this.sim.disconnect(p.id);
     this.sim.queues.set(client.sessionId,[]);this.votes.delete(client.sessionId);
     this.allowReconnection(client,20);
   }

@@ -71,6 +71,13 @@ export class WorldArt {
   private palm(root:THREE.Group,x:number,z:number){const trunk=this.wood,leaf=this.material('#64704b',{side:THREE.DoubleSide});this.cylinder(root,.15,.28,6.7,trunk,x,3.35,z);for(let i=0;i<9;i++){const g=new THREE.Group();g.position.set(x,6.5,z);g.rotation.y=i*Math.PI*2/9;for(let j=0;j<8;j++){const mesh=new THREE.Mesh(new THREE.PlaneGeometry(.7-j*.06,.75),leaf);mesh.position.set(0,-j*j*.022,-j*.38);mesh.rotation.x=-Math.PI/2-j*.07;mesh.rotation.z=(j%2?.12:-.12);g.add(mesh);}root.add(g);}}
   weapon(kind:Equipment,viewmodel=true){
     const g=new THREE.Group(),steel=this.metal,poly=this.dark,wood=this.wood;const pistol=kind==='pistol',smg=kind==='smg',dmr=kind==='marksman';
+    if(kind==='bomb'){
+      this.box(g,.38,.19,.3,poly,0,0,0);this.box(g,.32,.035,.27,wood,0,.11,0);
+      this.box(g,.16,.02,.075,this.material('#98ae76',{emissive:'#425b20',emissiveIntensity:.5}),-.065,.14,-.06);
+      for(let row=0;row<3;row++)for(let col=0;col<3;col++)this.box(g,.028,.018,.028,steel,.025+col*.04,.145,-.07+row*.04);
+      const light=new THREE.Mesh(new THREE.SphereGeometry(.024,8,8),this.material('#ff533c',{emissive:'#ff3820',emissiveIntensity:2}));light.name='bombLight';light.position.set(-.13,.15,.07);g.add(light);
+      if(viewmodel){this.box(g,.13,.11,.16,wood,-.19,-.07,.03);this.box(g,.13,.11,.16,wood,.19,-.07,.03);}return g;
+    }
     if(kind==='knife'){
       this.box(g,.08,.085,.22,poly,0,0,.02);this.box(g,.22,.035,.045,steel,0,0,-.11);
       const shape=new THREE.Shape();shape.moveTo(-.045,0);shape.lineTo(.045,0);shape.lineTo(.04,.31);shape.lineTo(0,.44);shape.lineTo(-.04,.31);shape.closePath();

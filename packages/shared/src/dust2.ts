@@ -158,5 +158,6 @@ export const DUST2:MapDefinition={
   bounds:{minX:-54,maxX:54,minZ:-57,maxZ:57},
   spawns:{red:[dustPoint(380,930,3.2),dustPoint(330,930,3.2),dustPoint(430,930,3.2),dustPoint(280,930,3.2)],blue:[dustPoint(590,225),dustPoint(590,190),dustPoint(563,225),dustPoint(590,260)]},
   pickups:[{id:'west-smg',...dustPoint(380,908,3.2),weapon:'smg',availableAt:0},{id:'east-smg',...dustPoint(590,247),weapon:'smg',availableAt:0},{id:'mid-dmr',...dustPoint(461,607,2.1*(607-438)/182),weapon:'marksman',availableAt:0},{id:'court-dmr',...dustPoint(115,453,3.2),weapon:'marksman',availableAt:0}],
+  bombSites:[{id:'A',...dustPoint(786,170),w:103*DUST_SCALE,d:68*DUST_SCALE,minY:3.7,maxY:3.9},{id:'B',...dustPoint(190,208),w:108*DUST_SCALE,d:116*DUST_SCALE,minY:1.9,maxY:2.75}],
   landmarks:[landmark('A',815,130),landmark('B',186,199),landmark('T SPAWN',377,939),landmark('CT SPAWN',590,222),landmark('LONG',879,423),landmark('PIT',885,626),landmark('MID',470,510),landmark('SHORT',646,310),landmark('TUNNELS',160,460)],
 };
