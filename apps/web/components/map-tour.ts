@@ -1,5 +1,6 @@
-import {dustPoint} from '@sirocco/shared';
+import {dustPoint,SCOUT_TOWER} from '@sirocco/shared';
 export const MAP_TOUR=[
+  {name:'MID · SCOUT TOWER',description:'Enter from Catwalk and climb the enclosed stairs to a lookout above the rooftops.',eye:dustPoint(563,563,SCOUT_TOWER.deck+1.6),target:dustPoint(480,300,7)},
   {name:'A · HOTEL AURORE',description:'The raised A platform overlooks Long and the CT crossing.',eye:dustPoint(892,273,5),target:dustPoint(797,132,6.4)},
   {name:'LONG · BLUE',description:'Double doors open into the street, with Blue to one side and Pit beyond.',eye:dustPoint(866,520,3.8),target:dustPoint(710,554,4)},
   {name:'MID · DOUBLE DOORS',description:'The central sightline connects Top Mid to the CT side.',eye:dustPoint(473,510,2.8),target:dustPoint(464,300,1.9)},

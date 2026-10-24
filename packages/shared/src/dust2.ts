@@ -1,3 +1,4 @@
+import {scoutTowerSolids} from './scout-tower';
 import type {MapDefinition, Solid, Vec3} from './index';
 
 // Hand-built reconstruction from the 1024px modern Dust II radar and Valve's
@@ -63,7 +64,11 @@ poly('Tunnel south block',[[66,502],[170,502],[170,576],[139,576],[139,610],[90,
 poly('Western central block',[[330,437],[439,437],[439,536],[418,536],[418,618],[394,618],[406,691],[446,691],[446,878],[344,878],[344,773],[300,773],[300,500],[330,500]],9.2,0,'kasbah');
 rect('Tunnel courtyard east',244,575,56,198,7.5,0,'wall','kasbah');
 poly('T spawn island',[[490,670],[570,670],[590,690],[590,810],[570,835],[500,835],[480,815],[480,688]],8.8,0,'plaster');
-poly('Mid bazaar',[[548,436],[675,436],[675,464],[690,464],[690,553],[673,553],[673,626],[548,626],[532,610],[532,454]],9.6,0,'plaster');
+// Carve an occupied interior out of the bazaar instead of hiding stairs in a solid building.
+poly('Mid bazaar',[[548,436],[675,436],[675,464],[690,464],[690,480],[532,480],[532,454]],9.6,0,'plaster');
+poly('Mid bazaar east',[[602,480],[690,480],[690,553],[673,553],[673,570],[602,570]],9.6,0,'plaster');
+poly('Mid bazaar south',[[532,570],[673,570],[673,626],[548,626],[532,610]],9.6,0,'plaster');
+solids.push(...scoutTowerSolids(dustPoint,DUST_SCALE));
 poly('Catwalk building',[[532,285],[616,285],[616,372],[576,372],[576,386],[532,386]],9.2,0,'plaster');
 rect('Catwalk east block',678,273,164,183,11.3,0,'wall','plaster');
 poly('Long door shop',[[738,580],[756,559],[778,580],[778,690],[846,690],[846,790],[738,790]],10.6,0,'plaster');
@@ -186,7 +191,7 @@ vehicle('CT truck',429,148,57,23,2.1,0,true);
 
 const landmark = (name:string,u:number,v:number)=>({name,...dustPoint(u,v)});
 export const DUST2:MapDefinition={
-  id:'dunes',name:'Dust II',subtitle:'Long · Mid · Tunnels',description:'Fight from the hotel at A to the kasbah at B. Long sightlines, raised catwalks and a covered tunnel flank.',solids,
+  id:'dunes',name:'Dust III',subtitle:'Long · Mid · Tunnels',description:'Fight from the hotel at A to the kasbah at B. Long sightlines, raised catwalks and a covered tunnel flank.',solids,
   bounds:{minX:-54,maxX:54,minZ:-57,maxZ:57},
   spawns:{red:[dustPoint(380,930,3.2),dustPoint(330,930,3.2),dustPoint(430,930,3.2),dustPoint(280,930,3.2)],blue:[dustPoint(590,225),dustPoint(590,190),dustPoint(563,225),dustPoint(590,260)]},
   pickups:[{id:'west-smg',...dustPoint(380,908,3.2),weapon:'smg',availableAt:0},{id:'east-smg',...dustPoint(590,247),weapon:'smg',availableAt:0},{id:'mid-dmr',...dustPoint(461,607,2.1*(607-438)/182),weapon:'marksman',availableAt:0},{id:'court-dmr',...dustPoint(115,453,3.2),weapon:'marksman',availableAt:0}],
@@ -196,5 +201,5 @@ export const DUST2:MapDefinition={
     {id:'A',...dustPoint(786,170),w:103*DUST_SCALE,d:68*DUST_SCALE,minY:3.7,maxY:3.9,marker:{...dustPoint(813,174,3.8),size:3.6}},
     {id:'B',...dustPoint(195,192),w:118*DUST_SCALE,d:148*DUST_SCALE,minY:1.9,maxY:2.75,marker:{...dustPoint(217,164,2.65),size:2.8}},
   ],
-  landmarks:[landmark('A',815,130),landmark('B',186,199),landmark('T SPAWN',377,939),landmark('CT SPAWN',590,222),landmark('LONG',879,423),landmark('PIT',885,626),landmark('MID',470,510),landmark('SHORT',646,310),landmark('TUNNELS',160,460)],
+  landmarks:[landmark('A',815,130),landmark('B',186,199),landmark('T SPAWN',377,939),landmark('CT SPAWN',590,222),landmark('LONG',879,423),landmark('PIT',885,626),landmark('MID',470,510),landmark('TOWER',567,525),landmark('SHORT',646,310),landmark('TUNNELS',160,460)],
 };

@@ -33,7 +33,7 @@ test('Dust II rendered floors match collision heights without holes or coinciden
   const ray=new THREE.Raycaster();let seed=87123;const random=()=>((seed=Math.imul(seed,1664525)+1013904223>>>0)/2**32);
   for(let i=0;i<2000;i++){
     const x=(random()-.5)*110,z=(random()-.5)*110;
-    ray.set(new THREE.Vector3(x,25,z),new THREE.Vector3(0,-1,0));
+    ray.set(new THREE.Vector3(x,Math.max(...floors.map(b=>b.y+b.h/2))+2,z),new THREE.Vector3(0,-1,0));
     const hits=ray.intersectObjects(meshes,false);
     assert.ok(hits.length>0,`missing visible floor at ${x}, ${z}`);
     // groundAt includes a 1mm seam margin; a ray has no radius at stair risers.

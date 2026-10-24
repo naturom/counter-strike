@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {DT,RADIUS,type AvatarId,sprayTarget,type Spray,BOMB_RULES,plantSite,canReachBomb,footprint,solidTop,intersects,ROUND_MS,WIN_SCORE,MAPS,DEFAULT_MAP,WEAPONS,KNIFE,isGun,direction,move,neutralInput,rayBox,rayPlayer,type HitZone,wallDistance,heightOf,eyeOf,nearestPickup,type Input,type Player,type Snapshot,type CombatEvent,type Solid,type Team,type MapId,type Pickup,type Grenade,type Equipment,type Vec3,type GameMode,type BombState} from '@sirocco/shared';
+import {DT,RADIUS,SCOUT_TOWER,type AvatarId,sprayTarget,type Spray,BOMB_RULES,plantSite,canReachBomb,footprint,solidTop,intersects,ROUND_MS,WIN_SCORE,MAPS,DEFAULT_MAP,WEAPONS,KNIFE,isGun,direction,move,neutralInput,rayBox,rayPlayer,type HitZone,wallDistance,heightOf,eyeOf,nearestPickup,type Input,type Player,type Snapshot,type CombatEvent,type Solid,type Team,type MapId,type Pickup,type Grenade,type Equipment,type Vec3,type GameMode,type BombState} from '@sirocco/shared';
 const freshAmmo=()=>({rifle:30,pistol:12,smg:0,marksman:0});
 export class Simulation {
   players=new Map<string,Player>();
@@ -8,6 +8,7 @@ export class Simulation {
   private nextShot=new Map<string,number>();
   private trigger=new Map<string,boolean>();
   private actions=new Map<string,{interact:boolean;throwAt:number}>();
+  private towerFalls=new Map<string,{height:number}>();
   private eventId=0;
   events:CombatEvent[]=[];
   sprays:Spray[]=[];
@@ -18,7 +19,7 @@ export class Simulation {
   round=1;readonly matchId=randomUUID();
   readonly mapId:MapId;
   solids:Solid[];pickups:Pickup[];grenades:Grenade[]=[];
-  constructor(mapOrSolids:MapId|Solid[]=DEFAULT_MAP,readonly mode:GameMode='deathmatch'){this.mapId=typeof mapOrSolids==='string'?mapOrSolids:'relay';this.solids=typeof mapOrSolids==='string'?MAPS[mapOrSolids].solids:mapOrSolids;this.pickups=MAPS[this.mapId].pickups.map(p=>({...p}));if(mode==='defusal'){if(this.mapId!=='dunes')throw new Error('Bomb Defusal requires Dust II');this.endsAt=0;this.resetBomb();}}
+  constructor(mapOrSolids:MapId|Solid[]=DEFAULT_MAP,readonly mode:GameMode='deathmatch'){this.mapId=typeof mapOrSolids==='string'?mapOrSolids:'relay';this.solids=typeof mapOrSolids==='string'?MAPS[mapOrSolids].solids:mapOrSolids;this.pickups=MAPS[this.mapId].pickups.map(p=>({...p}));if(mode==='defusal'){if(this.mapId!=='dunes')throw new Error('Bomb Defusal requires Dust III');this.endsAt=0;this.resetBomb();}}
   add(id:string,name:string,avatar:AvatarId='operator'):Player {
     if(this.players.size>=8)throw new Error('Room full (8/8).');
     const red=[...this.players.values()].filter(p=>p.team==='red').length,blue=this.players.size-red;
@@ -26,9 +27,10 @@ export class Simulation {
     const p:Player={id,name,team,avatar,x:0,y:0,z:0,vy:0,grounded:true,crouched:false,yaw:team==='red'?0:Math.PI,pitch:0,hp:100,kills:0,deaths:0,weapon:'rifle',primary:'rifle',ammo:freshAmmo(),grenades:2,reloadUntil:0,respawnAt:0,protectedUntil:0,connected:true,ack:0};
     this.players.set(id,p);this.queues.set(id,[]);this.spawn(p);if(this.mode==='defusal'){if(this.roundLive){p.hp=0;p.respawnAt=0;}else{const bomb=this.bombs.find(b=>b.team===team);if(bomb?.status==='dropped'&&!bomb.carrierId){bomb.status='carried';bomb.carrierId=id;}}}return p;
   }
-  remove(id:string){this.dropBomb(id);this.bombIntents.delete(id);this.players.delete(id);this.queues.delete(id);this.lastSeq.delete(id);this.nextShot.delete(id);this.trigger.delete(id);this.actions.delete(id);}
+  remove(id:string){this.towerFalls.delete(id);this.dropBomb(id);this.bombIntents.delete(id);this.players.delete(id);this.queues.delete(id);this.lastSeq.delete(id);this.nextShot.delete(id);this.trigger.delete(id);this.actions.delete(id);}
   input(id:string,i:Input){const prev=this.lastSeq.get(id)??0;if(i.seq<=prev||i.seq-prev>120)return;this.lastSeq.set(id,i.seq);const q=this.queues.get(id);if(!q)return;if(q.length>=8)q.shift();q.push(i);}
   spawn(p:Player){
+    this.towerFalls.delete(p.id);
     const others=[...this.players.values()].filter(o=>o.id!==p.id&&o.hp>0);
     const spots=MAPS[this.mapId].spawns[p.team].map(s=>({s,safety:Math.min(...others.map(o=>Math.hypot(o.x-s.x,o.z-s.z)),100)}));spots.sort((a,b)=>b.safety-a.safety);
     Object.assign(p,spots[0].s,{hp:100,vy:0,grounded:true,crouched:false,ammo:freshAmmo(),weapon:'rifle',primary:'rifle',grenades:2,reloadUntil:0,respawnAt:0,protectedUntil:this.time+1500,yaw:p.team==='red'?0:Math.PI,pitch:0});
@@ -44,7 +46,22 @@ export class Simulation {
       if(isGun(p.weapon)&&p.reloadUntil&&this.time>=p.reloadUntil){p.ammo[p.weapon]=WEAPONS[p.weapon].magazine;p.reloadUntil=0;}
       const i=this.queues.get(p.id)?.shift();
       const controls=i&&p.connected?i:{...neutralInput(),yaw:p.yaw,pitch:p.pitch,weapon:p.weapon,crouch:p.crouched};
+      const wasGrounded=p.grounded,fromY=p.y;
+      // Track departure from the elevated tower, including jumping over a parapet.
+      if(wasGrounded){
+        this.towerFalls.delete(p.id);
+        // Match movement's foot radius: players can stand with their centre beyond
+        // a parapet's edge while their feet still overlap its supporting surface.
+        const onTower=this.mapId==='dunes'&&fromY>=SCOUT_TOWER.deck-.05&&this.solids.some(b=>b.label?.startsWith('Scout tower')&&footprint(p,b)&&Math.abs(solidTop(b,p)-fromY)<.05);
+        if(onTower)this.towerFalls.set(p.id,{height:fromY});
+      }
       Object.assign(p,move(p,controls,this.solids));
+      const fall=this.towerFalls.get(p.id);
+      if(fall){
+        if(p.grounded){this.towerFalls.delete(p.id);if(fall.height-p.y>=3)this.damage(p,50,p,p.weapon,p,undefined,'fall');}
+        else fall.height=Math.max(fall.height,p.y);
+      }
+      if(p.hp<=0)continue;
       if(!i||!p.connected)continue;
       this.bombIntents.set(p.id,{input:i,at:this.time});
       p.ack=i.seq;p.yaw=i.yaw;p.pitch=i.pitch;
@@ -95,14 +112,14 @@ export class Simulation {
     const hit=target&&target.team!==p.team&&target.protectedUntil<=this.time?target:undefined;
     this.emit(p.weapon==='knife'?'melee':'shot',p,p.weapon,from,to,{target:hit?.id,hitZone:hit?hitZone:undefined});if(hit)this.damage(hit,hitZone==='head'?hit.hp:w.damage,p,p.weapon,from,hitZone);
   }
-  damage(victim:Player,amount:number,attacker:{id:string;team:Team},weapon:Equipment,from:Vec3,hitZone?:HitZone){
-    if(this.phase!=='playing'||victim.hp<=0||victim.protectedUntil>this.time||victim.team===attacker.team&&victim.id!==attacker.id)return;
+  damage(victim:Player,amount:number,attacker:{id:string;team:Team},weapon:Equipment,from:Vec3,hitZone?:HitZone,cause?:CombatEvent['cause']){
+    if(this.phase!=='playing'||victim.hp<=0||victim.protectedUntil>this.time&&cause!=='fall'||victim.team===attacker.team&&victim.id!==attacker.id)return;
     const dealt=Math.min(victim.hp,Math.max(0,Math.round(amount)));if(!dealt)return;victim.hp-=dealt;
-    this.emit('damage',attacker,weapon,from,this.eye(victim),{target:victim.id,damage:dealt,hp:victim.hp,hitZone});
+    this.emit('damage',attacker,weapon,from,this.eye(victim),{target:victim.id,damage:dealt,hp:victim.hp,hitZone,cause});
     if(!victim.hp){
       this.dropBomb(victim.id);victim.deaths++;victim.respawnAt=this.time+3000;victim.reloadUntil=0;
       const killer=this.players.get(attacker.id);if(victim.team!==attacker.team){if(killer)killer.kills++;if(this.mode==='deathmatch')this.scores[attacker.team]++;}
-      this.emit('kill',attacker,weapon,from,victim,{target:victim.id,name:killer?.name??'Departed player',victim:victim.name,hitZone});
+      this.emit('kill',attacker,weapon,from,victim,{target:victim.id,name:killer?.name??'Departed player',victim:victim.name,hitZone,cause});
       if(this.mode==='deathmatch'&&this.scores[attacker.team]>=WIN_SCORE)this.finish();
     }
   }

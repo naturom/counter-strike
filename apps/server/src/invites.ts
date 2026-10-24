@@ -15,7 +15,7 @@ export function signer(secret:string) {
       if(data.v!==1||! /^[a-f0-9]{32}$/.test(data.id)||!Number.isSafeInteger(data.exp)||data.exp<=now)throw new Error('Invitation expired. Create a new room.');
       if(data.mapId!==undefined&&!validMap(data.mapId))throw new Error('Invalid map');
       if(data.mode!==undefined&&!validMode(data.mode))throw new Error('Invalid mode');
-      if(data.mode==='defusal'&&data.mapId!=='dunes')throw new Error('Bomb Defusal requires Dust II');
+      if(data.mode==='defusal'&&data.mapId!=='dunes')throw new Error('Bomb Defusal requires Dust III');
       return {...data,mapId:data.mapId??'relay',mode:data.mode??'deathmatch'};
     }
   };

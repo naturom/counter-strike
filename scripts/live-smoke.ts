@@ -33,7 +33,7 @@ async function main(){
     const room=await new Client(base.replace(/^http/,'ws')).consumeSeatReservation(data.reservation);room.reconnection.enabled=false;const a:Agent={room,seq:0,updates:0};agents.push(a);room.onMessage('snapshot',(s:Snapshot)=>{a.state=s;a.updates++;});room.onMessage('combat',()=>{});room.onMessage('votes',()=>{});await until(()=>!!a.state);return a;
   }
   try{
-    assert.equal((await fetch(base+'/health')).status,200);const html=await (await fetch(base)).text();assert.match(html,/COUNTER STRIKE/);
+    assert.equal((await fetch(base+'/health')).status,200);const html=await (await fetch(base)).text();assert.match(html,/SUPER STRIKE/);
     const a=await join('Verify-Red'),b=await join('Verify-Blue');assert.equal(a.room.roomId,b.room.roomId);
     assert.equal(a.state!.mapId,mapId);
     await drive(a,{x:-25,z:16});a.room.send('input',{...neutralInput(),seq:++a.seq,interact:true});await until(()=>a.state!.players.find(p=>p.id===a.room.sessionId)?.primary==='smg');

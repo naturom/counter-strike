@@ -1,13 +1,13 @@
 import {buildVehicle} from './vehicle-model';
 import * as THREE from 'three';
-import {DUST2,dustPoint,DUST_SCALE} from '@sirocco/shared';
+import {DUST2,dustPoint,DUST_SCALE,SCOUT_TOWER} from '@sirocco/shared';
 import {solidTop,groundAt,type Solid} from '@sirocco/shared';
 import type {WorldArt} from './world';
 import {solidGeometry,visibleFloorGeometry} from './map-geometry';
-import {buildDoor,weatherWall,portalTrim,streetLamp,roundedBox,palmFrond,wallWear,rooftopDetails,groundContact,wallSignMount,DUST_ROUTE_SIGNS,roadPaintGeometry,tunnelRoofFrame,facadeCable,DUST_CABLES} from './environment-details';
+import {buildDoor,weatherWall,portalTrim,streetLamp,roundedBox,wallWear,rooftopDetails,groundContact,wallSignMount,DUST_ROUTE_SIGNS,roadPaintGeometry,tunnelRoofFrame,facadeCable,DUST_CABLES} from './environment-details';
 
 export function buildDust(art:WorldArt){
-  const root=new THREE.Group();root.name='Dust II';
+  const root=new THREE.Group();root.name='Dust III';
   const finish=(color:string,normal=.5)=>art.material(color,{map:art.plaster.map,normalMap:art.plaster.normalMap,roughnessMap:art.plaster.roughnessMap,normalScale:new THREE.Vector2(normal,normal),vertexColors:true});
   const plaster=finish('#e8deca'),chalk=finish('#faf6e9'),clay=finish('#c8ad86',.65),ochre=finish('#ddc39b',.6);
   const road=art.asphalt,paving=art.paving;
@@ -15,7 +15,7 @@ export function buildDust(art:WorldArt){
   const blue=art.material('#40677a',{roughness:.76,metalness:.32}),teal=art.material('#497c76'),red=art.material('#ae5847'),iron=art.material('#39413f',{metalness:.55,roughness:.56});
   const glass=art.material('#344b51',{roughness:.3,metalness:.25}),rubber=art.material('#282d2b'),tarp=art.material('#858c6b');
   const box=(w:number,h:number,d:number,m:THREE.Material,x:number,y:number,z:number)=>art.box(root,w,h,d,m,x,y,z);
-  const material=(b:Solid)=>b.style==='door'?gateWood:b.kind==='floor'&&(b.label?.startsWith('Tunnel stair')||b.label?.startsWith('Lower tunnel'))?art.stone:b.style==='road'?road:b.style==='tile'||b.label==='B plant platform'?paving:b.style==='metal'?blue:b.kind==='crate'?crateWood:b.kind==='floor'?art.sand:b.style==='kasbah'?(b.x<-20?clay:ochre):b.style==='plaster'?(b.z>5?chalk:plaster):art.stone;
+  const material=(b:Solid)=>b.style==='door'?gateWood:b.kind==='floor'&&(b.label?.startsWith('Scout tower')||b.label?.startsWith('Tunnel stair')||b.label?.startsWith('Lower tunnel'))?art.stone:b.style==='road'?road:b.style==='tile'||b.label==='B plant platform'?paving:b.style==='metal'?blue:b.kind==='crate'?crateWood:b.kind==='floor'?art.sand:b.style==='kasbah'?(b.x<-20?clay:ochre):b.style==='plaster'?(b.z>5?chalk:plaster):art.stone;
   art.box(root,230,.25,230,art.sand,0,-.43,0,true);
   // Reserve unobstructed masonry at cable brackets; no window may sit behind one.
   const cableAnchors=DUST_CABLES.flatMap(c=>{
@@ -48,6 +48,7 @@ export function buildDust(art:WorldArt){
     if(b.kind==='roof'&&b.label?.includes('gate lintel'))portalTrim(art,root,b,ochre,groundAt({x:b.x,z:b.z},floors));
     // Façades follow actual polygon edges; details stay above players and don't
     // introduce visual obstacles that are absent from authoritative collision.
+    if(b.label?.startsWith('Scout tower'))continue;
     if(b.kind!=='wall'||b.h<6||(b.label?.includes('Perimeter')||b.label?.includes('stairwell')))continue;
     const pts=b.polygon??[[b.x-b.w/2,b.z-b.d/2],[b.x+b.w/2,b.z-b.d/2],[b.x+b.w/2,b.z+b.d/2],[b.x-b.w/2,b.z+b.d/2]];
     const area=pts.reduce((sum,p,i)=>sum+p[0]*pts[(i+1)%pts.length][1]-pts[(i+1)%pts.length][0]*p[1],0);
@@ -55,7 +56,7 @@ export function buildDust(art:WorldArt){
       const p=pts[i],q=pts[(i+1)%pts.length],dx=q[0]-p[0],dz=q[1]-p[1],length=Math.hypot(dx,dz);if(length<2.4)continue;
       const outward=area>0?1:-1,nx=dz/length*outward,nz=-dx/length*outward;
       const group=new THREE.Group();group.position.set((p[0]+q[0])/2+nx*.045,0,(p[1]+q[1])/2+nz*.045);group.rotation.y=Math.atan2(nx,nz);root.add(group);
-      const roof=b.y+b.h/2,base=Math.max(b.y-b.h/2,groundAt({x:(p[0]+q[0])/2+nx*.25,z:(p[1]+q[1])/2+nz*.25},floors));
+      const roof=b.y+b.h/2,base=Math.max(b.y-b.h/2,groundAt({x:(p[0]+q[0])/2+nx*.25,z:(p[1]+q[1])/2+nz*.25},floors,roof));
       art.box(group,length+.08,.22,.22,art.trim,0,roof-.12,0);
       wallWear(art,group,length,base,i+Math.round(Math.abs(b.x*7+b.z*11)));
       // A few occupied façades among plain walls; keep deliberate, regular bays
@@ -78,29 +79,33 @@ export function buildDust(art:WorldArt){
       if(length>5)streetLamp(art,group,-length/2+.65,base,roof,iron);
     }
   }
+  // Purpose-built tower details stay attached to the shared masonry and stair solids.
+  const towerBox=(u:number,v:number,y:number,w:number,h:number,d:number,m:THREE.Material)=>{const p=dustPoint(u,v,y);return box(w,h,d,m,p.x,p.y,p.z);};
+  const {deck,levels}=SCOUT_TOWER;
+  for(let level=0;level<levels;level++){
+    const y=1.7+level*3.36;
+    // Shallow stone belt courses make the tall shaft read as load-bearing masonry.
+    towerBox(531.6,525,y+.16,.08,.20,90*DUST_SCALE,art.trim);
+    for(const v of [479.6,570.4])towerBox(567,v,y+.16,70*DUST_SCALE,.20,.08,art.trim);
+    if(level<levels){
+      const at=dustPoint(568,484.3,y+2.8),glow=art.material('#efd5a4',{emissive:'#ffd39b',emissiveIntensity:.65});
+      box(.48,.20,.10,iron,at.x,at.y,at.z);box(.36,.11,.025,glow,at.x,at.y,at.z+.06);
+      art.sign(root,`${level*2+1} / LOOKOUT ↑`,at.x,at.y-.7,at.z+.075,0,'#3d5c55',1.5);
+    }
+  }
+  for(const b of DUST2.solids.filter(b=>b.label?.startsWith('Scout tower west stair')||b.label?.startsWith('Scout tower east stair'))){
+    // Contrasting tread nosings help players read the step heights indoors.
+    box(b.w-.06,.022,.055,art.trim,b.x,b.y+b.h/2+.012,b.z+(b.label!.includes('west')?1:-1)*(b.d/2-.028));
+  }
+  for(const [u,v,w,d] of [[567,587,106*DUST_SCALE,.26],[567,463,106*DUST_SCALE,.26],[515,525,.26,122*DUST_SCALE],[619,525,.26,122*DUST_SCALE]])towerBox(u,v,deck+.805,w,.10,d,art.trim);
+  // Beams terminate on the four canopy piers rather than floating beyond the roof.
+  for(const v of [465,585])towerBox(567,v,deck+3.08,100*DUST_SCALE,.16,.22,art.timber);
+  for(const u of [517,617])towerBox(u,525,deck+3.08,.22,.16,120*DUST_SCALE,art.timber);
+  const entry=dustPoint(531.5,549,5.02);art.sign(root,'SCOUT TOWER ↑',entry.x,entry.y,entry.z,-Math.PI/2,'#3d5c55',1.9);
   for(const [u,v,y] of [[306,480,5.9],[306,444,5.9],[367,411,3.12]]){
     const p=dustPoint(u,v),lamp=art.material('#e8d5a7',{emissive:'#f5cf89',emissiveIntensity:.9});
     box(.42,.07,.20,iron,p.x,y+.04,p.z);box(.32,.025,.13,lamp,p.x,y,p.z);
     const light=new THREE.PointLight('#ffe1ad',7,8,2);light.position.set(p.x,y-.1,p.z);root.add(light);
-  }
-  // Tall hotel façade and balcony at A: the primary visual landmark.
-  const hotel=dustPoint(815,10);const hotelGroup=new THREE.Group();hotelGroup.position.set(hotel.x,0,hotel.z);root.add(hotelGroup);
-  art.box(hotelGroup,12,10,6,chalk,0,8.8,-4);
-  art.box(hotelGroup,12.4,.3,6.4,art.trim,0,13.9,-4);
-  for(let x=-4.8;x<=4.8;x+=2.4){
-    art.box(hotelGroup,1.6,4.8,.1,glass,x,9.2,-.94);
-    arch(hotelGroup,x,6.6,-.82,1.9,4.6,art.trim,0);
-    art.box(hotelGroup,.16,6,.25,art.trim,x-1,9.4,-.7);
-  }
-  art.box(hotelGroup,12.8,.22,1.2,art.trim,0,6.6,-.65);
-  for(let x=-6;x<=6;x+=.28)art.box(hotelGroup,.035,.9,.035,teal,x,7.12,-.05);
-  art.box(hotelGroup,12.4,.06,.06,teal,0,7.56,-.05);
-  art.sign(root,'HÔTEL AURORE',hotel.x,12.9,hotel.z-.65,0,'#477e7b',8);
-  art.sign(root,'A',hotel.x-4.5,5.4,hotel.z-.95,0,'#a85945',1.25);
-  // Kasbah skyline, buttresses and crenellations outside the playing space.
-  for(const [u,v] of [[75,10],[255,75],[158,60],[45,180]]){
-    const p=dustPoint(u,v);box(3.8,12,3.8,clay,p.x,6,p.z);box(4,.25,4,ochre,p.x,11.8,p.z);
-    for(let k=0;k<4;k++)box(.45,.6,.65,ochre,p.x-1.4+k*.95,12.25,p.z+1.65);
   }
   for(const [u,v,y,w,rot] of [[118,327,3.2,4.3,0],[160,414,3.2,5,0],[466,359,0,8.1,0],[710,553,2.1,5.8,0],[710,670,2.1,5.8,0]] as number[][]){const p=dustPoint(u,v);arch(root,p.x,y,p.z,w,3.3,ochre,rot);}
   // A framed roof light: short joists seat on headers at the actual slab edges.
@@ -126,11 +131,6 @@ export function buildDust(art:WorldArt){
   // Painted lane edge conforms to the road, including the ramp/landing join.
   const laneWhite=art.material('#d8d3c5',{roughness:1,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1}),laneRed=art.material('#aa5847',{roughness:1,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1});
   for(let v=155;v<500;v+=12){const p=dustPoint(920,v),paint=new THREE.Mesh(roadPaintGeometry(floors,p.x,p.z,.22,1.25),(v/12|0)%2?laneWhite:laneRed);paint.receiveShadow=true;root.add(paint);}
-  // Palms are outside routes, with compact trunks kept outside shared bounds.
-  for(const [u,v,y] of [[800,-20,14.05],[850,-20,14.05],[51,260,0],[42,715,0],[977,365,0],[956,85,0]])palm(u,v,y);
-  // Skyline behind the courtyard walls; deterministic variation avoids regeneration flicker.
-  for(let i=0;i<19;i++){const x=-80+i*9,h=8+(i*7%11),z=-67-(i%3)*5;box(7.6,h,9,i%3?plaster:ochre,x,h/2,z);box(7.9,.25,9.3,art.trim,x,h,z);for(let k=0;k<3;k++)box(.8,1.4,.08,glass,x-2.4+k*2.4,h-2,z+4.55);}
-  const minaret=dustPoint(355,-70);art.cylinder(root,1.7,2.1,24,chalk,minaret.x,12,minaret.z);art.cylinder(root,2.7,2.7,.6,art.trim,minaret.x,21,minaret.z);const dome=new THREE.Mesh(new THREE.SphereGeometry(1.8,18,10,0,Math.PI*2,0,Math.PI/2),teal);dome.position.set(minaret.x,24,minaret.z);root.add(dome);
   for(const cable of DUST_CABLES)facadeCable(art,root,DUST2.solids.filter(b=>b.label===cable.a),DUST2.solids.filter(b=>b.label===cable.b),dustPoint(cable.from[0],cable.from[1]),dustPoint(cable.to[0],cable.to[1]),iron);
   for(const pickup of DUST2.pickups){box(1.2,.18,.7,art.dark,pickup.x,pickup.y+.09,pickup.z);box(1.25,.04,.75,iron,pickup.x,pickup.y+.2,pickup.z);}
   return root;
@@ -147,5 +147,5 @@ export function buildDust(art:WorldArt){
     groundContact(art,root,b.x,b.y-b.h/2,b.z,b.w,b.d);
     root.add(buildVehicle(art,b));
   }
-  function palm(u:number,v:number,y:number){const p=dustPoint(u,v),bark=art.timber;art.cylinder(root,.13,.25,6.5,bark,p.x,y+3.25,p.z);const green=art.material('#68704b',{roughness:1,side:THREE.DoubleSide});for(let i=0;i<11;i++){const group=new THREE.Group();group.position.set(p.x,y+6.3,p.z);group.rotation.y=i*Math.PI*2/11;group.rotation.x=(i%3)*.06;group.add(palmFrond(green,2.8+(i%3)*.28));root.add(group);}}
+
 }
