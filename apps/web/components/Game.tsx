@@ -1,7 +1,8 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
 import {Client, type Room} from '@colyseus/sdk';
-import {WEAPONS,MAPS,BOMB_TARGET,DEFAULT_MAP,validMap,weaponLabel,isGun,type GameMode,type MapId,type Snapshot,type CombatEvent} from '@sirocco/shared';
+import {WEAPONS,MAPS,AVATARS,validAvatar,type AvatarId,BOMB_TARGET,DEFAULT_MAP,validMap,weaponLabel,isGun,type GameMode,type MapId,type Snapshot,type CombatEvent} from '@sirocco/shared';
+import {AvatarPreview,AvatarPicker} from './AvatarPreview';
 import {Arena} from './arena';
 import {MAP_TOUR} from './map-tour';
 import {Minimap} from './Minimap';
@@ -11,6 +12,7 @@ import type {ScopeLevel} from './sniper-scope';
 const wait=(ms:number)=>new Promise(r=>setTimeout(r,ms));
 export default function Game(){
   const canvas=useRef<HTMLCanvasElement>(null);const arena=useRef<Arena|null>(null);const room=useRef<Room|null>(null);const intentional=useRef(false);const client=useRef<Client|null>(null);const inviteRef=useRef('');const nameRef=useRef('');const reconnecting=useRef(false);
+  const [appearance,setAppearance]=useState<AvatarId>('ironman');const appearanceRef=useRef<AvatarId>('ironman');appearanceRef.current=appearance;
   const [scopeLevel,setScopeLevel]=useState<ScopeLevel>(0);
   const [selectedMode,setSelectedMode]=useState<GameMode>('defusal');
   const [resultReady,setResultReady]=useState(true);const resultTimer=useRef<ReturnType<typeof setTimeout>|null>(null);const lastResult=useRef('');
@@ -21,13 +23,14 @@ export default function Game(){
   const [ready,setReady]=useState(false),[name,setName]=useState(''),[invite,setInvite]=useState(''),[status,setStatus]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[playing,setPlaying]=useState(false),[locked,setLocked]=useState(false),[board,setBoard]=useState(false),[snap,setSnap]=useState<Snapshot|null>(null),[feed,setFeed]=useState<(CombatEvent&{at:number})[]>([]),[copied,setCopied]=useState(false),[hit,setHit]=useState(false),[sound,setSound]=useState(true),[votes,setVotes]=useState(''),[notice,setNotice]=useState('');
   const [selectedMap,setSelectedMap]=useState<MapId>(DEFAULT_MAP),[pickup,setPickup]=useState(''),[hurt,setHurt]=useState(false),[damageAngle,setDamageAngle]=useState(0);const hurtTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   useEffect(()=>{
+    const savedAppearance=localStorage.getItem('counter-strike-avatar');if(validAvatar(savedAppearance)&&savedAppearance!=='operator')setAppearance(savedAppearance);
     setName(localStorage.getItem('sirocco-name')??'');const token=new URLSearchParams(location.hash.slice(1)).get('invite')??'';setInvite(token);inviteRef.current=token;if(token)setScreen('profile');
     client.current=new Client(`${location.protocol==='https:'?'wss':'ws'}://${location.host}`);
     try{arena.current=new Arena(canvas.current!,{input:i=>room.current?.send('input',i),lock:setLocked,board:setBoard,pickup:setPickup,scope:setScopeLevel,damage:angle=>{setDamageAngle(angle);setHurt(true);if(hurtTimer.current)clearTimeout(hurtTimer.current);hurtTimer.current=setTimeout(()=>setHurt(false),350);}});if(token){try{const payload=JSON.parse(atob(token.split('.')[0].replace(/-/g,'+').replace(/_/g,'/')));const mapId=validMap(payload.mapId)?payload.mapId:'relay';setSelectedMap(mapId);setSelectedMode(payload.mode==='defusal'?'defusal':'deathmatch');arena.current.setMap(mapId);}catch{}}setReady(true);}catch{setError('WebGL is unavailable. Use a desktop browser with hardware acceleration enabled.');}
     return()=>{if(resultTimer.current)clearTimeout(resultTimer.current);if(hurtTimer.current)clearTimeout(hurtTimer.current);intentional.current=true;void room.current?.leave();arena.current?.destroy();};
   },[]);
   function attach(next:Room){
-    next.reconnection.enabled=false;room.current=next;arena.current?.start(next.sessionId);setPlaying(true);setBusy(false);setStatus('Connected');
+    next.reconnection.enabled=false;next.send('appearance',{avatar:appearanceRef.current});room.current=next;arena.current?.start(next.sessionId);setPlaying(true);setBusy(false);setStatus('Connected');
     sessionStorage.setItem('sirocco-reconnect',JSON.stringify({invite:inviteRef.current,token:next.reconnectionToken}));
     next.onMessage('snapshot',(s:Snapshot)=>{const resultKey=`${s.matchId}:${s.round}:${s.phase}`;if(lastResult.current!==resultKey){lastResult.current=resultKey;if(resultTimer.current)clearTimeout(resultTimer.current);if(s.phase==='finished'&&s.bombs.some(b=>b.status==='exploded')){setResultReady(false);resultTimer.current=setTimeout(()=>setResultReady(true),3200);}else setResultReady(true);}setSnap(s);setSelectedMode(s.mode);setSelectedMap(s.mapId);arena.current?.update(s);});
     next.onMessage('votes',(v:{count:number;needed:number})=>setVotes(`${v.count} / ${v.needed} votes`));
@@ -48,7 +51,7 @@ export default function Game(){
     }catch(e){setError((e as Error).message);setStatus('');}finally{setBusy(false);}
   }
   async function reserve(token:string){
-    const response=await fetch('/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nickname:nameRef.current,invite:token||undefined,mapId:selectedMap,mode:selectedMode}),signal:AbortSignal.timeout(45000)});
+    const response=await fetch('/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nickname:nameRef.current,avatar:appearanceRef.current,invite:token||undefined,mapId:selectedMap,mode:selectedMode}),signal:AbortSignal.timeout(45000)});
     const data=await response.json();if(!response.ok)throw new Error(data.error??'Could not join room');
     if(data.mode)setSelectedMode(data.mode);if(validMap(data.mapId)){setSelectedMap(data.mapId);arena.current?.setMap(data.mapId);}
     inviteRef.current=data.invite;setInvite(data.invite);history.replaceState(null,'',`/#invite=${data.invite}`);
@@ -65,7 +68,7 @@ export default function Game(){
     setBusy(false);reconnecting.current=false;
   }
   async function join(){
-    if(!name.trim()){setError('Enter a callsign to join.');return;}intentional.current=false;setError('');setNotice('');setBusy(true);setStatus('Opening room · a cold start may take a moment…');nameRef.current=name.trim();localStorage.setItem('sirocco-name',nameRef.current);
+    if(!name.trim()){setError('Enter a callsign to join.');return;}intentional.current=false;setError('');setNotice('');setBusy(true);setStatus('Opening room · a cold start may take a moment…');nameRef.current=name.trim();localStorage.setItem('sirocco-name',nameRef.current);localStorage.setItem('counter-strike-avatar',appearanceRef.current);
     try{
       const saved=JSON.parse(sessionStorage.getItem('sirocco-reconnect')??'null');
       if(saved?.invite===inviteRef.current&&saved.token){try{attach(await client.current!.reconnect(saved.token));return;}catch{sessionStorage.removeItem('sirocco-reconnect');}}
@@ -82,7 +85,7 @@ export default function Game(){
   const armed=snap?.bombs.filter(b=>b.status==='planted')??[];const fuse=armed.length?Math.min(...armed.map(b=>b.explodeAt)):null;
   const me=snap?.players.find(p=>p.id===room.current?.sessionId);const remaining=snap?Math.max(0,Math.ceil(((fuse??snap.endsAt)-snap.time)/1000)):600;const time=(snap?.mode??selectedMode)==='defusal'&&fuse===null?'∞':`${String(Math.floor(remaining/60)).padStart(2,'0')}:${String(remaining%60).padStart(2,'0')}`;
   const map=MAPS[snap?.mapId??selectedMap];const defusal=(snap?.mode??selectedMode)==='defusal';
-  return <main className={playing?'app in-game':'app'}>
+  return <main className={playing?'app in-game':screen==='profile'?'app profile-flow':'app'}>
     <canvas ref={canvas} className="arena" aria-label={`${map.name} desert arena`} />
     {!playing?preview!==null?<div className="map-tour"><div className="tour-heading"><span>DUST II / FIELD RECON</span><button onClick={()=>scout(null)}>BACK TO LOBBY</button></div><div className="tour-caption"><span>{String(preview+1).padStart(2,'0')} / {MAP_TOUR.length}</span><h2>{MAP_TOUR[preview].name}</h2><p>{MAP_TOUR[preview].description}</p><nav aria-label="Map viewpoints">{MAP_TOUR.map((view,i)=><button key={view.name} aria-pressed={preview===i} onClick={()=>scout(i)}>{view.name.split(' · ')[0]}</button>)}</nav></div></div>:<>
       <div className="lobby-shade"/>
@@ -96,9 +99,10 @@ export default function Game(){
             <button className="primary" type="submit" disabled={!ready||busy}>{busy?'CREATING…':'CREATE A ROOM'} <span>↗</span></button>
           </form>:<form className="join-card profile-card" onSubmit={e=>{e.preventDefault();void join();}}>
             <div className="card-heading"><span>{createdHere?'ROOM CREATED':'INVITATION RECEIVED'}</span></div>
-            <h2>Customize your profile.</h2><p className="profile-description">Choose the callsign your squad will see in the arena.</p>
+            <h2>Customize your profile.</h2><p className="profile-description">Choose your callsign and the character your squad will see.</p>
             <div className="profile-room"><span>{map.name}</span><span>{defusal?'BOMB DEFUSAL':'TEAM DEATHMATCH'}</span></div>
             <label htmlFor="callsign">YOUR CALLSIGN</label><div className="entry"><span className="input-icon">⌁</span><input key="profile-callsign" id="callsign" maxLength={20} placeholder="Enter a guest nickname" value={name} onChange={e=>setName(e.target.value)} autoComplete="nickname" autoFocus required disabled={busy}/></div>
+            <AvatarPicker value={appearance} onChange={setAppearance} disabled={busy}/>
             <button className="primary" type="submit" disabled={!ready||busy||!name.trim()}>{busy?'CONNECTING…':createdHere?'ENTER THE ROOM':'JOIN THE ROOM'}<span>↗</span></button>
             <div className="card-foot"><span className="dot"/> Your team is assigned automatically.</div>
             <button type="button" className="secondary" onClick={share}>{copied?'COPIED ✓':'COPY INVITATION LINK'}</button>
@@ -107,7 +111,7 @@ export default function Game(){
           </form>}
           {(error||status)&&<p className={error?'message error':'message'} role="status">{error||status}</p>}
         </div>
-        <aside className="map-label"><span className="map-kicker">{map.subtitle.toUpperCase()}</span><h2>{map.name.toUpperCase()}</h2><p>{map.description}</p><div className="map-stats"><div><b>{defusal?'C4':'30'}</b><span>{defusal?'PLANT / DEFUSE':'KILLS TO WIN'}</span></div><div><b>{defusal?'∞':<>10<span>:00</span></>}</b><span>ROUND TIME</span></div></div>{selectedMap==='dunes'&&<button className="scout-map" onClick={()=>scout(0)}>SCOUT THE MAP</button>}</aside>
+        {screen==='profile'?<aside className="appearance-stage"><div className="eyebrow">APPEARANCE PREVIEW</div><AvatarPreview avatar={appearance}/><div className="appearance-caption"><span>{String(AVATARS.findIndex(a=>a.id===appearance)+1).padStart(2,'0')} / {AVATARS.length}</span><h2>{AVATARS.find(a=>a.id===appearance)?.name}</h2><p>{AVATARS.find(a=>a.id===appearance)?.detail}</p><small>DRAG TO ROTATE · YOUR SQUAD WILL SEE THIS LOOK</small></div></aside>:        <aside className="map-label"><span className="map-kicker">{map.subtitle.toUpperCase()}</span><h2>{map.name.toUpperCase()}</h2><p>{map.description}</p><div className="map-stats"><div><b>{defusal?'C4':'30'}</b><span>{defusal?'PLANT / DEFUSE':'KILLS TO WIN'}</span></div><div><b>{defusal?'∞':<>10<span>:00</span></>}</b><span>ROUND TIME</span></div></div>{selectedMap==='dunes'&&<button className="scout-map" onClick={()=>scout(0)}>SCOUT THE MAP</button>}</aside>}
       </section>
       <footer className="lobby-footer"><span>BUILT FOR THE BROWSER. MADE FOR THE SQUAD.</span><span><a href="/audio/CREDITS.txt" target="_blank" rel="noreferrer">AUDIO CREDITS</a> · DESKTOP + MOUSE</span></footer>
     </>:<>

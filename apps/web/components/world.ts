@@ -3,7 +3,7 @@ import {mergeGeometries} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {equipmentModel} from './weapon-models';
 import {buildDust} from './dust-world';
 import {facadeCable} from './environment-details';
-import {MAPS,type MapId,type Equipment} from '@sirocco/shared';
+import {MAPS,type MapId,type Equipment,type AvatarId} from '@sirocco/shared';
 export function disposeGroup(group:THREE.Object3D){group.traverse(o=>{if(o instanceof THREE.Mesh||o instanceof THREE.Line)o.geometry.dispose();});group.removeFromParent();}
 export class WorldArt {
   materials:THREE.Material[]=[];textures:THREE.Texture[]=[];
@@ -75,6 +75,6 @@ export class WorldArt {
     return root;
   }
   private palm(root:THREE.Group,x:number,z:number){const trunk=this.wood,leaf=this.material('#64704b',{side:THREE.DoubleSide});this.cylinder(root,.15,.28,6.7,trunk,x,3.35,z);for(let i=0;i<9;i++){const g=new THREE.Group();g.position.set(x,6.5,z);g.rotation.y=i*Math.PI*2/9;for(let j=0;j<8;j++){const mesh=new THREE.Mesh(new THREE.PlaneGeometry(.7-j*.06,.75),leaf);mesh.position.set(0,-j*j*.022,-j*.38);mesh.rotation.x=-Math.PI/2-j*.07;mesh.rotation.z=(j%2?.12:-.12);g.add(mesh);}root.add(g);}}
-  weapon(kind:Equipment,viewmodel=true,heldByAvatar=false){return equipmentModel(this,kind,viewmodel,heldByAvatar);}
+  weapon(kind:Equipment,viewmodel=true,heldByAvatar=false,avatar:AvatarId='operator'){return equipmentModel(this,kind,viewmodel,heldByAvatar,avatar);}
   destroy(){for(const m of this.materials)m.dispose();for(const t of this.textures)t.dispose();}
 }

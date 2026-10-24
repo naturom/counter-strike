@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import type {Equipment} from '@sirocco/shared';
+import type {Equipment,AvatarId} from '@sirocco/shared';
 import {addHands} from './held-equipment';
 import type {WorldArt} from './world';
 
@@ -132,9 +132,9 @@ function bomb(art:WorldArt,g:THREE.Group,p:Finish){
   for(const x of [-.155,.155])for(const z of [-.098,.098])screw(g,x,.102,z,p,'y');
   const led=new THREE.Mesh(new THREE.SphereGeometry(.009,12,10),art.material('#f34a25',{emissive:'#ff3010',emissiveIntensity:2}));led.name='bombLight';led.position.set(-.15,.12,.045);g.add(led);
 }
-export function equipmentModel(art:WorldArt,kind:Equipment,viewmodel=true,heldByAvatar=false){
+export function equipmentModel(art:WorldArt,kind:Equipment,viewmodel=true,heldByAvatar=false,avatar:AvatarId='operator'){
   const g=new THREE.Group(),p=palette(art);
   switch(kind){case 'rifle':rifle(art,g,p,viewmodel);break;case 'pistol':pistol(art,g,p);break;case 'smg':smg(art,g,p,viewmodel);break;case 'marksman':sniper(art,g,p,viewmodel);break;case 'knife':knife(g,p,viewmodel);break;case 'grenade':grenade(art,g,p);break;case 'bomb':bomb(art,g,p);break;}
   g.traverse(o=>{if(o instanceof THREE.Mesh){o.castShadow=true;o.receiveShadow=true;}});
-  return viewmodel||heldByAvatar?addHands(art,g,kind,heldByAvatar):g;
+  return viewmodel||heldByAvatar?addHands(art,g,kind,heldByAvatar,avatar):g;
 }

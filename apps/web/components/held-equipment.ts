@@ -1,21 +1,27 @@
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import {mergeGeometries} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import {isGun,type Equipment} from '@sirocco/shared';
+import {isGun,type Equipment,type AvatarId} from '@sirocco/shared';
 import type {WorldArt} from './world';
+import {CHARACTER_STYLE} from './character-style';
 import {knifeSwing} from './knife-swing';
 
-type Materials={fabric:THREE.Material;leather:THREE.Material;rubber:THREE.Material;seam:THREE.Material;sleeve:THREE.Material};
-const palettes=new WeakMap<WorldArt,Materials>();
-function materials(art:WorldArt){
-  let result=palettes.get(art);if(result)return result;
+type Materials={fabric:THREE.Material;leather:THREE.Material;rubber:THREE.Material;seam:THREE.Material;sleeve:THREE.Material;accent:THREE.Material;glow:THREE.Material;avatar:AvatarId};
+const palettes=new WeakMap<WorldArt,Map<AvatarId,Materials>>();
+function materials(art:WorldArt,avatar:AvatarId){
+  const cache=palettes.get(art)??new Map<AvatarId,Materials>();palettes.set(art,cache);let result=cache.get(avatar);if(result)return result;const style=CHARACTER_STYLE[avatar];
   const canvas=document.createElement('canvas');canvas.width=canvas.height=256;
   const ctx=canvas.getContext('2d')!;ctx.fillStyle='#a69b82';ctx.fillRect(0,0,256,256);
   // Original woven fabric, with a fine, deterministic raised thread pattern.
   for(let y=0;y<256;y+=3)for(let x=0;x<256;x+=3){const n=(x*17+y*31)%23;ctx.fillStyle=`rgba(${n<12?'38,32,24':'237,223,188'},${.08+n*.005})`;ctx.fillRect(x,y,2,1);ctx.fillRect(x+1,y+1,1,2);}
+  if(style.surface==='bark'){
+    ctx.fillStyle='#b9ab8c';ctx.fillRect(0,0,256,256);
+    for(let i=0;i<45;i++){const x=i*6;ctx.strokeStyle=i%3?'#6a604f':'#dfd0af';ctx.lineWidth=i%4===0?3:1;ctx.beginPath();ctx.moveTo(x,0);ctx.bezierCurveTo(x+14,85,x-12,170,x+4,256);ctx.stroke();}
+  }
   const map=new THREE.CanvasTexture(canvas);map.colorSpace=THREE.SRGBColorSpace;map.wrapS=map.wrapT=THREE.RepeatWrapping;art.textures.push(map);
-  result={fabric:art.material('#8d8169',{map,roughness:.95}),leather:art.material('#3c3d35',{roughness:.76}),rubber:art.material('#242b27',{roughness:.87}),seam:art.material('#b6a488',{roughness:1}),sleeve:art.material('#5d6650',{map,roughness:1})};
-  palettes.set(art,result);return result;
+  const bare=style.surface==='skin'||style.surface==='bark',armor=style.surface==='armor';
+  result={avatar,fabric:art.material(style.hands,{map:style.surface==='bark'?map:null,bumpMap:map,bumpScale:style.surface==='bark'?.004:bare?.0008:.00035,metalness:armor?style.metal:0,roughness:armor?.38:.82}),leather:art.material(bare?style.hands:style.trim,{roughness:.76}),rubber:art.material(bare?style.hands:style.trim,{roughness:.87}),seam:art.material(bare?style.secondary:style.trim,{roughness:.85}),sleeve:art.material(bare?style.hands:style.primary,{map:style.surface==='bark'?map:null,bumpMap:map,bumpScale:style.surface==='bark'?.006:bare?.001:.0006,metalness:armor?style.metal:.02,roughness:armor?.4:.86}),accent:art.material(style.secondary,{metalness:style.metal,roughness:.42}),glow:art.material('#d7f5ff',{emissive:'#83d9ff',emissiveIntensity:2})};
+  cache.set(avatar,result);return result;
 }
 const v=(p:number[])=>new THREE.Vector3(...p as [number,number,number]);
 function rounded(parent:THREE.Group,size:number[],at:number[],mat:THREE.Material,r=.015){const m=new THREE.Mesh(new RoundedBoxGeometry(size[0],size[1],size[2],3,r),mat);m.position.copy(v(at));parent.add(m);return m;}
@@ -47,6 +53,16 @@ function hand(m:Materials,left:boolean,open=false){
   rounded(g,[.092,.061,.048],[0,-.001,.102],m.rubber,.012);
   rounded(g,[.078,.012,.022],[0,.031,.103],m.fabric,.004);
   for(let i=0;i<8;i++)rounded(g,[.003,.002,.008],[-.033+i*.009,.038,.103],m.seam,.001);
+  if(m.avatar==='ironman'){
+    rounded(g,[.10,.016,.09],[0,.032,.012],m.accent,.01);
+    const reactor=new THREE.Mesh(new THREE.CylinderGeometry(.023,.023,.005,32),m.glow);reactor.position.set(0,-.039,.01);g.add(reactor);
+    for(let i=0;i<4;i++)rounded(g,[.018,.012,.035],[-.043+i*.028,.025,-.045],m.accent,.004);
+  }
+  if(m.avatar==='spiderman'){
+    for(const x of [-.04,0,.04])tube(g,[[x,.029,.08],[x*.75,.029,.01],[x,.023,-.06]],.0016,m.seam);
+    for(const z of [-.035,.005,.045,.08])tube(g,[[-.05,.022,z],[0,.030,z-.009],[.05,.022,z]],.0015,m.seam);
+  }
+  if(m.avatar==='groot')for(let i=0;i<8;i++){const x=-.045+i*.013;tube(g,[[x,.025,.09],[x+.007,.030,.02],[x-.005,.025,-.06]],.0025,i%2?m.accent:m.seam);}
   bake(g);return g;
 }
 function arm(m:Materials,left:boolean,at:number[],rotation:number[],open=false,thirdPerson=false){
@@ -58,12 +74,26 @@ function arm(m:Materials,left:boolean,at:number[],rotation:number[],open=false,t
   limb(root,wrist.toArray(),cuff.toArray(),.043,.071,m.fabric);
   const seam=cuff.clone().lerp(elbow,.65);
   tube(root,[[cuff.x,cuff.y+.052,cuff.z],[seam.x,seam.y+.072,seam.z],[elbow.x,elbow.y+.09,elbow.z]],.002,m.seam);
+  if(['ironman','batman','wonder-woman','thor','black-widow'].includes(m.avatar)){
+    const panel=new THREE.Group(),delta=elbow.clone().sub(cuff);panel.position.copy(cuff).lerp(elbow,.46);panel.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.clone().normalize());root.add(panel);
+    const guard=new THREE.Mesh(new THREE.CylinderGeometry(.10,.075,delta.length()*.70,8,1,true),m.avatar==='wonder-woman'||m.avatar==='thor'?m.accent:m.sleeve);panel.add(guard);
+    for(const y of [-.08,0,.08])rounded(panel,[.14,.017,.11],[0,y,0],m.avatar==='ironman'?m.accent:m.rubber,.005);
+    if(m.avatar==='batman')for(let i=0;i<3;i++){const fin=new THREE.Mesh(new THREE.ConeGeometry(.026,.09,3),m.accent);fin.position.set(.11,-.08+i*.07,0);fin.rotation.z=-1;panel.add(fin);}
+    if(m.avatar==='black-widow')for(let i=0;i<6;i++)oval(panel,[.012,.027,.012],[Math.cos(i*Math.PI/3)*.09,0,Math.sin(i*Math.PI/3)*.09],m.accent);
+  }
+  if(m.avatar==='spiderman'){
+    const axis=elbow.clone().sub(cuff).normalize(),u=new THREE.Vector3(1,0,0).cross(axis).normalize(),w=axis.clone().cross(u).normalize();
+    const at=(t:number,a:number)=>cuff.clone().lerp(elbow,t).addScaledVector(u,Math.cos(a)*(.075+t*.038)).addScaledVector(w,Math.sin(a)*(.075+t*.038)).toArray();
+    for(let ring=1;ring<7;ring++){const pts=[];for(let i=0;i<=24;i++)pts.push(at(ring/7,i*Math.PI/12));tube(root,pts,.0013,m.seam);}
+    for(let line=0;line<8;line++)tube(root,[at(.05,line*Math.PI/4),at(.5,line*Math.PI/4),at(.96,line*Math.PI/4)],.0014,m.seam);
+  }
+  if(m.avatar==='groot')for(let i=0;i<9;i++){const p=cuff.clone().lerp(elbow,i/10),q=cuff.clone().lerp(elbow,(i+2)/10);tube(root,[[p.x+.06,p.y+.045,p.z],[q.x+.065,q.y+.065,q.z]],.005,i%2?m.accent:m.seam);}
   // Sleeve folds follow the forearm, rather than floating rings.
-  for(const t of [.28,.42,.61]){const p=cuff.clone().lerp(elbow,t);oval(root,[.077,.016,.03],[p.x,p.y+.045,p.z],m.sleeve);}
+  if(!['skin','bark'].includes(CHARACTER_STYLE[m.avatar].surface))for(const t of [.28,.42,.61]){const p=cuff.clone().lerp(elbow,t);oval(root,[.077,.016,.03],[p.x,p.y+.045,p.z],m.sleeve);}
   bake(root);return root;
 }
-export function addHands(art:WorldArt,body:THREE.Group,kind:Equipment,thirdPerson=false){
-  const m=materials(art),root=new THREE.Group();body.name='equipmentBody';root.add(body);
+export function addHands(art:WorldArt,body:THREE.Group,kind:Equipment,thirdPerson=false,avatar:AvatarId='operator'){
+  const m=materials(art,avatar),root=new THREE.Group();body.name='equipmentBody';root.add(body);
   let right:number[]=[.082,-.125,.055],left:number[]=[-.025,-.105,-.33],rr=[0,0,-1.2],lr=[0,0,Math.PI];
   if(kind==='pistol'){left=[-.055,-.14,.075];lr=[.1,.15,1.15];}
   if(kind==='smg')left=[-.025,-.11,-.255];
@@ -75,7 +105,7 @@ export function addHands(art:WorldArt,body:THREE.Group,kind:Equipment,thirdPerso
   if(kind==='knife'&&!thirdPerson){
     const pivot=new THREE.Group(),origin=new THREE.Vector3(.075,-.025,.04);pivot.name='knifeWrist';pivot.position.copy(origin);root.add(pivot);pivot.add(body,r);body.position.sub(origin);r.position.sub(origin);root.userData.knifeRig={pivot,origin};
   }
-  root.userData.handRig={right:r,left:l,body,magazine:body.getObjectByName('magazine')};return root;
+  root.userData.avatar=avatar;root.userData.handRig={right:r,left:l,body,magazine:body.getObjectByName('magazine')};return root;
 }
 export type HeldPose={reload:number;throwProgress:number;plant:number;slash?:number;reverseSlash?:boolean;reduceMotion?:boolean};
 export function animateHands(root:THREE.Group,kind:Equipment,pose:HeldPose){

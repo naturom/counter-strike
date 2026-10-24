@@ -1,6 +1,6 @@
 import { Room, type Client, ServerError } from '@colyseus/core';
 import { Simulation } from './simulation';
-import { validInput } from '@sirocco/shared';
+import { validInput,validAvatar,type AvatarId } from '@sirocco/shared';
 import type { signer } from './invites';
 export const roomsByInvite=new Map<string,string>();
 export const activeRooms=new Map<string,ArenaRoom>();
@@ -35,6 +35,7 @@ export class ArenaRoom extends Room {
       const p=this.sim.players.get(client.sessionId);
       if(value.forward||value.strafe||value.fire||value.reload||value.jump||value.crouch||value.interact||value.spray||p&&Math.abs(p.yaw-value.yaw)>0.01)this.idle.set(client.sessionId,Date.now());
     });
+    this.onMessage('appearance',(client,value)=>{if(!this.allow(client.sessionId)||!validAvatar(value?.avatar))return;const player=this.sim.players.get(client.sessionId);if(player)player.avatar=value.avatar;});
     this.onMessage('rematch',(client)=>{
       if(!this.allow(client.sessionId)||this.sim.phase!=='finished')return;
       this.votes.add(client.sessionId);this.idle.set(client.sessionId,Date.now());
@@ -44,14 +45,15 @@ export class ArenaRoom extends Room {
     });
     log('room_created',{room:this.roomId,match:this.sim.matchId});
   }
-  onAuth(_client:Client,options:{invite:string;nickname:string}) {
+  onAuth(_client:Client,options:{invite:string;nickname:string;avatar?:AvatarId}) {
     if(inviteSigner.verify(options.invite).id!==this.inviteId)throw new ServerError(403,'Wrong invitation');
     if(typeof options.nickname!=='string'||!options.nickname.trim()||options.nickname.length>20)throw new ServerError(400,'Nickname must be 1–20 characters');
-    return {name:options.nickname.trim().replace(/[\x00-\x1f\x7f]/g,'')||'Guest'};
+    if(options.avatar!==undefined&&!validAvatar(options.avatar))throw new ServerError(400,'Unknown appearance');
+    return {avatar:options.avatar??'operator',name:options.nickname.trim().replace(/[\x00-\x1f\x7f]/g,'')||'Guest'};
   }
-  onJoin(client:Client,_options:unknown,auth:{name:string}) {
+  onJoin(client:Client,_options:unknown,auth:{name:string;avatar:AvatarId}) {
     this.profileExpiry?.clear();this.profileExpiry=undefined;this.autoDispose=true;
-    this.sim.add(client.sessionId,auth.name);this.idle.set(client.sessionId,Date.now());
+    this.sim.add(client.sessionId,auth.name,auth.avatar);this.idle.set(client.sessionId,Date.now());
     log('player_joined',{room:this.roomId,players:this.sim.players.size});
   }
   onDrop(client:Client) {
