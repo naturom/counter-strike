@@ -1,0 +1,16 @@
+REALISTIC CHARACTER ANATOMY AND HAIR
+
+Source: MakeHuman CC0 system assets, exported by kblood/CharacterCreator.
+Repository: https://github.com/kblood/CharacterCreator
+Pinned source commit: 852e48f316b90a0937234886630e4fb4cdfd1f78
+Asset license: CC0 1.0 Universal https://creativecommons.org/publicdomain/zero/1.0/
+The source project identifies the exported output/*.glb assets as CC0,
+separately from its GPL application code. No application code is bundled here.
+
+Included derivatives: posed male/female/muscular anatomy, eyes, eyebrows,
+eyelashes, skin albedo and normals, long01, bob02 and short02 hair meshes/textures.
+Geometry compacted, posed and partitioned using scripts/build-character-assets.mjs.
+Original source asset declarations: characters/source-asset-licenses.json.
+
+Character costumes, armor, symbols and surface treatments are original game code.
+Character names remain associated with their respective rights holders.

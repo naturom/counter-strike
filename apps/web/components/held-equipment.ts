@@ -3,6 +3,7 @@ import {RoundedBoxGeometry} from 'three/examples/jsm/geometries/RoundedBoxGeomet
 import {mergeGeometries} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {isGun,type Equipment,type AvatarId} from '@sirocco/shared';
 import type {WorldArt} from './world';
+import {realHandGeometry,anatomicalSkinTextures} from './character-anatomy';
 import {CHARACTER_STYLE} from './character-style';
 import {knifeSwing} from './knife-swing';
 
@@ -20,14 +21,14 @@ function materials(art:WorldArt,avatar:AvatarId){
   }
   const map=new THREE.CanvasTexture(canvas);map.colorSpace=THREE.SRGBColorSpace;map.wrapS=map.wrapT=THREE.RepeatWrapping;art.textures.push(map);
   const bare=style.surface==='skin'||style.surface==='bark',armor=style.surface==='armor';
-  result={avatar,fabric:art.material(style.hands,{map:style.surface==='bark'?map:null,bumpMap:map,bumpScale:style.surface==='bark'?.004:bare?.0008:.00035,metalness:armor?style.metal:0,roughness:armor?.38:.82}),leather:art.material(bare?style.hands:style.trim,{roughness:.76}),rubber:art.material(bare?style.hands:style.trim,{roughness:.87}),seam:art.material(bare?style.secondary:style.trim,{roughness:.85}),sleeve:art.material(bare?style.hands:style.primary,{map:style.surface==='bark'?map:null,bumpMap:map,bumpScale:style.surface==='bark'?.006:bare?.001:.0006,metalness:armor?style.metal:.02,roughness:armor?.4:.86}),accent:art.material(style.secondary,{metalness:style.metal,roughness:.42}),glow:art.material('#d7f5ff',{emissive:'#83d9ff',emissiveIntensity:2})};
+  result={avatar,fabric:art.material(style.hands,{map:style.surface==='bark'?map:null,bumpMap:map,bumpScale:style.surface==='bark'?.004:bare?.0008:.00035,metalness:armor?style.metal:0,roughness:armor?.38:.82,...(style.surface==='skin'?anatomicalSkinTextures(art):{})}),leather:art.material(bare?style.hands:style.trim,{roughness:.76}),rubber:art.material(bare?style.hands:style.trim,{roughness:.87}),seam:art.material(bare?style.secondary:style.trim,{roughness:.85}),sleeve:art.material(bare?style.hands:style.primary,{map:style.surface==='bark'?map:null,bumpMap:map,bumpScale:style.surface==='bark'?.006:bare?.001:.0006,metalness:armor?style.metal:.02,roughness:armor?.4:.86}),accent:art.material(style.secondary,{metalness:style.metal,roughness:.42}),glow:art.material('#d7f5ff',{emissive:'#83d9ff',emissiveIntensity:2})};
   cache.set(avatar,result);return result;
 }
 const v=(p:number[])=>new THREE.Vector3(...p as [number,number,number]);
 function rounded(parent:THREE.Group,size:number[],at:number[],mat:THREE.Material,r=.015){const m=new THREE.Mesh(new RoundedBoxGeometry(size[0],size[1],size[2],3,r),mat);m.position.copy(v(at));parent.add(m);return m;}
 function oval(parent:THREE.Group,size:number[],at:number[],mat:THREE.Material){const m=new THREE.Mesh(new THREE.SphereGeometry(1,12,10),mat);m.scale.copy(v(size));m.position.copy(v(at));parent.add(m);return m;}
 function tube(parent:THREE.Group,points:number[][],radius:number,mat:THREE.Material){const path=new THREE.CatmullRomCurve3(points.map(v));const mesh=new THREE.Mesh(new THREE.TubeGeometry(path,16,radius,8,false),mat);parent.add(mesh);return mesh;}
-function limb(parent:THREE.Group,start:number[],end:number[],a:number,b:number,mat:THREE.Material){const from=v(start),to=v(end),delta=to.clone().sub(from);const mesh=new THREE.Mesh(new THREE.CylinderGeometry(b,a,delta.length(),16,1),mat);mesh.position.copy(from).add(to).multiplyScalar(.5);mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());parent.add(mesh);oval(parent,[b,b,b],end,mat);}
+function limb(parent:THREE.Group,start:number[],end:number[],a:number,b:number,mat:THREE.Material){const from=v(start),to=v(end),delta=to.clone().sub(from);const mesh=new THREE.Mesh(new THREE.LatheGeometry([[a*.92,-delta.length()/2],[a,-delta.length()*.33],[(a+b)*.52,0],[b,delta.length()*.30],[b*.92,delta.length()/2]].map(([r,y])=>new THREE.Vector2(r,y)),24),mat);mesh.position.copy(from).add(to).multiplyScalar(.5);mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());parent.add(mesh);oval(parent,[b,b,b],end,mat);}
 function bake(group:THREE.Group){
   group.updateMatrixWorld(true);const groups=new Map<THREE.Material,THREE.BufferGeometry[]>();
   group.traverse(o=>{if(o instanceof THREE.Mesh){const mat=o.material as THREE.Material;const geo=(o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone()).applyMatrix4(o.matrixWorld);const list=groups.get(mat)??[];list.push(geo);groups.set(mat,list);o.geometry.dispose();}});
@@ -35,21 +36,7 @@ function bake(group:THREE.Group){
 }
 function hand(m:Materials,left:boolean,open=false){
   const g=new THREE.Group();
-  rounded(g,[.112,.052,.137],[0,0,.015],m.fabric,.022);
-  rounded(g,[.088,.018,.092],[0,-.028,.013],m.leather,.01);
-  // Separate metacarpal pads, finger joints and stitched finger gussets.
-  for(let i=0;i<4;i++){
-    const x=-.043+i*.028,length=[.088,.104,.099,.077][i];
-    const points=open?[[x,0,-.039],[x*1.22,.004,-.075],[x*1.4,-.009,-.055-length],[x*1.48,-.032,-.067-length]]:
-      [[x,0,-.039],[x,-.012,-.077],[x,-.052,-.09-length*.22],[x,-.086,-.061],[x,-.071,-.02]];
-    tube(g,points,.0135,m.fabric);
-    oval(g,[.016,.011,.021],[x,.027,-.026],m.rubber);
-    oval(g,[.014,.009,.014],points[1].map((n,j)=>n+(j===1?.01:0)),m.leather);
-    tube(g,points.slice(0,3).map(p=>[p[0]+.009,p[1]+.006,p[2]]),.0012,m.seam);
-  }
-  const side=left?1:-1;
-  tube(g,[[side*.045,-.008,.05],[side*.075,-.025,.01],[side*.065,-.056,-.026],[side*.024,-.07,-.044]],.019,m.fabric);
-  oval(g,[.022,.011,.025],[side*.061,-.014,.015],m.leather);
+  g.add(new THREE.Mesh(realHandGeometry(m.avatar,left,open),m.fabric));
   rounded(g,[.092,.061,.048],[0,-.001,.102],m.rubber,.012);
   rounded(g,[.078,.012,.022],[0,.031,.103],m.fabric,.004);
   for(let i=0;i<8;i++)rounded(g,[.003,.002,.008],[-.033+i*.009,.038,.103],m.seam,.001);

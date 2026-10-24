@@ -6,7 +6,7 @@ import {WorldArt,disposeGroup} from '../apps/web/components/world';
 import {animateHands} from '../apps/web/components/held-equipment';
 import {CHARACTER_STYLE} from '../apps/web/components/character-style';
 test('each character has matching hands on every weapon and all action poses stay finite',()=>{
- const previous=globalThis.document;
+ const previous=globalThis.document,load=THREE.TextureLoader.prototype.load;THREE.TextureLoader.prototype.load=function(){return new THREE.Texture();};
  const ctx=new Proxy({}, {get:()=>()=>{}});
  globalThis.document={createElement:()=>({width:256,height:256,getContext:()=>ctx})} as unknown as Document;
  try{
@@ -19,5 +19,5 @@ test('each character has matching hands on every weapon and all action poses sta
    }
    art.destroy();
   }
- }finally{globalThis.document=previous;}
+ }finally{globalThis.document=previous;THREE.TextureLoader.prototype.load=load;}
 });
