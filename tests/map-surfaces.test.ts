@@ -1,3 +1,4 @@
+import {surfaceAt} from '../apps/web/components/combat-audio';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -94,4 +95,23 @@ test('B doors and exterior render one continuous surface across both ramp edges'
     for(let i=1;i<hits.length;i++)assert.ok(Math.abs(hits[i].point.y-hits[i-1].point.y)>1e-4,`B coplanar floor faces at ${u},${v}`);
   }
   meshes.forEach(m=>m.geometry.dispose());material.dispose();
+});
+
+test('stairwell floor sides do not duplicate the adjoining wall faces',()=>{
+ const floor=DUST2.solids.find(b=>b.label==='Upper tunnels')!,walls=DUST2.solids.filter(b=>['Tunnel stairwell west','Lower tunnels block','Western central block'].includes(b.label??''));
+ const geometry=visibleFloorGeometry(floor,DUST2.solids.filter(b=>b.kind==='floor'),walls),mesh=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({side:THREE.DoubleSide})),ray=new THREE.Raycaster();
+ for(const v of [420,436,438,455,480]){
+  const p=dustPoint(288,v,1.5);ray.set(new THREE.Vector3(p.x,p.y,p.z),new THREE.Vector3(-1,0,0));ray.far=.4;
+  assert.equal(ray.intersectObject(mesh).length,0,`duplicate floor face against stair wall at ${v}`);
+ }
+ geometry.dispose();mesh.material.dispose();
+});
+
+test('A cobblestone/road boundary footsteps match the floor that is actually rendered',()=>{
+ const floors=DUST2.solids.filter(b=>b.kind==='floor'),material=new THREE.MeshBasicMaterial(),meshes=floors.map(b=>new THREE.Mesh(visibleFloorGeometry(b,floors),material)),ray=new THREE.Raycaster();
+ for(const u of [880,900,920,930])for(const v of [140,149.9,150.1,160]){
+  const p=dustPoint(u,v);p.y=groundAt(p,DUST2.solids);ray.set(new THREE.Vector3(p.x,20,p.z),new THREE.Vector3(0,-1,0));const hit=ray.intersectObjects(meshes)[0];assert.ok(hit);
+  const floor=floors[meshes.findIndex(mesh=>mesh===hit.object)];assert.equal(surfaceAt(p,DUST2.solids),floor.style==='road'?'asphalt':'stone',`audio differs from visible ${floor.label} at ${u},${v}`);
+ }
+ meshes.forEach(m=>m.geometry.dispose());material.dispose();
 });

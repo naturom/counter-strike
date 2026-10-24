@@ -50,3 +50,18 @@ CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/
 
 Knife changes: trimmed recording onset/tail, converted to mono 22.05 kHz PCM
 WAV, peak-adjusted, added 2 ms edge fades. Original speed/pitch retained.
+
+RECORDED AEROSOL SPRAY
+Spray Can.wav by PixaPexelAudio, CC0 (public domain).
+https://freesound.org/people/PixaPexelAudio/sounds/674984/
+Source: Freesound HQ MP3 preview. Three individual bursts trimmed, converted to
+mono PCM WAV, high-passed at 80 Hz, peak-normalized and gently faded.
+License: https://creativecommons.org/publicdomain/zero/1.0/
+
+ASPHALT FOOTSTEPS
+footsteps shoes walk road asphalt hard.flac by kyles, CC0 (public domain).
+https://freesound.org/people/kyles/sounds/637556/
+Source: Freesound public HQ MP3 preview. Four isolated footfalls trimmed at
+original speed, converted to mono 22.05 kHz PCM WAV, high-passed at 70 Hz,
+DC-corrected, peak-normalized and given short click-free fades.
+License: https://creativecommons.org/publicdomain/zero/1.0/

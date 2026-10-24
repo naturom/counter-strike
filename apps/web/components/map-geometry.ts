@@ -22,14 +22,29 @@ function volumePlanes(b:Solid):Plane[]{
   return [[1,0,0,-b.x+b.w/2],[-1,0,0,b.x+b.w/2],[0,0,1,-b.z+b.d/2],[0,0,-1,b.z+b.d/2],[0,1,0,-b.y+b.h/2],[axis==='x'?slope:0,-1,axis==='z'?slope:0,intercept]];
 }
 
+/** Concave building footprints are clipped as a union of triangular prisms. */
+function wallVolumes(b:Solid):Plane[][]{
+  if(!b.polygon)return [volumePlanes(b)];
+  const contour=b.polygon.map(([x,z])=>new THREE.Vector2(x,z));
+  return THREE.ShapeUtils.triangulateShape(contour,[]).map(indices=>{
+    const pts=indices.map(i=>b.polygon![i]),area=pts.reduce((n,p,i)=>n+p[0]*pts[(i+1)%3][1]-pts[(i+1)%3][0]*p[1],0),sign=Math.sign(area);
+    const sides:Plane[]=pts.map((a,i)=>{const c=pts[(i+1)%3],dx=c[0]-a[0],dz=c[1]-a[1];return [-dz*sign,0,dx*sign,(dz*a[0]-dx*a[1])*sign];});
+    return [...sides,[0,1,0,-b.y+b.h/2],[0,-1,0,b.y+b.h/2]] as Plane[];
+  });
+}
+
 /** Render the union of floor volumes, retaining the underside of raised bridges.
  * Clipping covered faces prevents both coplanar depth fighting and buried ramp
  * faces. Collision still uses the original, identical shared floor volumes. */
-export function visibleFloorGeometry(b:Solid,floors:Solid[]):THREE.BufferGeometry {
+export function visibleFloorGeometry(b:Solid,floors:Solid[],walls:Solid[]=[]):THREE.BufferGeometry {
   const source=solidGeometry(b),raw=source.index?source.toNonIndexed():source;
   const positions=raw.attributes.position,normals=raw.attributes.normal;
   const output:number[]=[],normalOutput:number[]=[],uv:number[]=[];
   const ownIndex=floors.indexOf(b),others=floors.map((other,index)=>({other,index,planes:volumePlanes(other)})).filter(({other})=>other!==b&&Math.abs(other.x-b.x)<(other.w+b.w)/2+EPS&&Math.abs(other.z-b.z)<(other.d+b.d)/2+EPS);
+  // Unlike a neighbouring floor, a wall owns coincident faces unconditionally.
+  for(const wall of walls)if(Math.abs(wall.x-b.x)<(wall.w+b.w)/2+EPS&&Math.abs(wall.z-b.z)<(wall.d+b.d)/2+EPS){
+    for(const planes of wallVolumes(wall))others.push({other:wall,index:-1,planes});
+  }
   for(let i=0;i<positions.count;i+=3){
     const normal:Point=[normals.getX(i),normals.getY(i),normals.getZ(i)];
     let fragments:Point[][]=[[0,1,2].map(k=>[positions.getX(i+k),positions.getY(i+k),positions.getZ(i+k)] as Point)];

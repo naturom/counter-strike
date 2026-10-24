@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {mergeGeometries} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {equipmentModel} from './weapon-models';
 import {buildDust} from './dust-world';
+import {facadeCable} from './environment-details';
 import {MAPS,type MapId,type Equipment} from '@sirocco/shared';
 export function disposeGroup(group:THREE.Object3D){group.traverse(o=>{if(o instanceof THREE.Mesh||o instanceof THREE.Line)o.geometry.dispose();});group.removeFromParent();}
 export class WorldArt {
@@ -60,7 +61,7 @@ export class WorldArt {
     // Distant minaret and detailed palm silhouettes, no copied game assets.
     this.cylinder(root,1.6,2,19,this.stone,-38,9.5,-26);this.cylinder(root,2.2,2.2,.5,this.trim,-38,17,-26);const dome=new THREE.Mesh(new THREE.SphereGeometry(1.7,20,12,0,Math.PI*2,0,Math.PI/2),brick);dome.position.set(-38,19,-26);root.add(dome);
     for(const [x,z] of [[-28,9],[28,-8],[-8,21],[9,-21]])this.palm(root,x,z);
-    for(const z of [-9,10]){const pts=[];for(let i=0;i<=24;i++){const t=i/24;pts.push(new THREE.Vector3(-26+t*52,7-Math.sin(t*Math.PI)*1.5,z));}const mat=new THREE.LineBasicMaterial({color:'#3c3933'});this.materials.push(mat);root.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),mat));}
+    for(const z of [-9,10])facadeCable(this,root,[map.solids[0]],[map.solids[1]],{x:-29.4,z},{x:29.4,z},this.metal);
     // Drain grates and worn ground markings provide visual scale at eye level.
     for(const [x,z] of [[0,6],[26,0],[-26,10]]){for(let i=0;i<8;i++)this.box(root,.6,.015,.025,this.metal,x,.012,z+i*.08);}
     return this.batch(root);

@@ -1,9 +1,10 @@
 import type {SoundKind} from './combat-audio';
 export const RECORDED_AUDIO:Partial<Record<SoundKind,string[]>>={
+ 'spray':Array.from({length:3},(_,i)=>`/audio/spray/spray-${i}.wav`),
  'knife':Array.from({length:4},(_,i)=>`/audio/knife/swing-${i}.wav`),
  'knife-hit':Array.from({length:2},(_,i)=>`/audio/knife/hit-${i}.wav`),
  'knife-wall':Array.from({length:2},(_,i)=>`/audio/knife/wall-${i}.wav`),
- ...Object.fromEntries(['stone','grit','metal','wood'].map(surface=>[`step-${surface}`,Array.from({length:4},(_,i)=>`/audio/footsteps/${surface}-${i}.wav`)])),
+ ...Object.fromEntries(['asphalt','stone','grit','metal','wood'].map(surface=>[`step-${surface}`,Array.from({length:4},(_,i)=>`/audio/footsteps/${surface}-${i}.wav`)])),
  ...Object.fromEntries(['rifle','pistol','smg','marksman'].map(weapon=>[`reload-${weapon}`,[`/audio/reloads/${weapon}.wav`]])),
 };
 /** Same-origin, bundled PCM recordings work without third-party services or Ogg

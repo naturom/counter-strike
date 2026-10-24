@@ -57,18 +57,19 @@ export const MAPS:Record<MapId,MapDefinition>={
 export const DEFAULT_MAP:MapId='dunes';
 export const validMap = (value:unknown):value is MapId => value==='dunes'||value==='relay';
 export const SOLIDS=MAPS[DEFAULT_MAP].solids, SPAWNS=MAPS[DEFAULT_MAP].spawns;
-export interface Input {seq:number;forward:number;strafe:number;yaw:number;pitch:number;jump:boolean;sprint:boolean;fire:boolean;reload:boolean;weapon:Equipment;crouch:boolean;interact:boolean;}
+export interface Input {seq:number;forward:number;strafe:number;yaw:number;pitch:number;jump:boolean;sprint:boolean;fire:boolean;reload:boolean;weapon:Equipment;crouch:boolean;interact:boolean;spray?:boolean;}
 export const neutralInput=():Input=>({seq:0,forward:0,strafe:0,yaw:0,pitch:0,jump:false,sprint:false,fire:false,reload:false,weapon:'rifle',crouch:false,interact:false});
 export interface Motion extends Vec3 {vy:number;grounded:boolean;crouched?:boolean;}
 export interface Player extends Motion {id:string;name:string;team:Team;yaw:number;pitch:number;hp:number;kills:number;deaths:number;weapon:Equipment;primary:Weapon;ammo:Record<Weapon,number>;grenades:number;crouched:boolean;reloadUntil:number;respawnAt:number;protectedUntil:number;connected:boolean;ack:number;}
 export interface Grenade extends Vec3 {id:number;owner:string;team:Team;vx:number;vy:number;vz:number;explodeAt:number;}
-export interface Snapshot {mode:GameMode;bomb:BombState|null;bombs:BombState[];roundLive:boolean;outcome:string;mapId:MapId;matchId:string;round:number;time:number;endsAt:number;phase:'playing'|'finished';winner:Team|'draw'|null;scores:Record<Team,number>;players:Player[];pickups:Pickup[];grenades:Grenade[];}
-export interface CombatEvent {type:'shot'|'melee'|'kill'|'damage'|'reload'|'pickup'|'grenade'|'explosion'|'bombPlant'|'bombDefuse'|'bombAction';id:number;shooter:string;target?:string;name?:string;victim?:string;team:Team;weapon:Equipment;from:Vec3;to:Vec3;damage?:number;hp?:number;}
+export interface Spray {id:number;owner:string;position:Vec3;normal:Vec3;size?:number;ray?:{origin:Vec3;direction:Vec3};expiresAt:number;}
+export interface Snapshot {sprays:Spray[];mode:GameMode;bomb:BombState|null;bombs:BombState[];roundLive:boolean;outcome:string;mapId:MapId;matchId:string;round:number;time:number;endsAt:number;phase:'playing'|'finished';winner:Team|'draw'|null;scores:Record<Team,number>;players:Player[];pickups:Pickup[];grenades:Grenade[];}
+export interface CombatEvent {type:'spray'|'shot'|'melee'|'kill'|'damage'|'reload'|'pickup'|'grenade'|'explosion'|'bombPlant'|'bombDefuse'|'bombAction';id:number;shooter:string;target?:string;name?:string;victim?:string;team:Team;weapon:Equipment;from:Vec3;to:Vec3;damage?:number;hp?:number;}
 export function validInput(value:unknown):value is Input {
   if(!value||typeof value!=='object')return false;const i=value as Input;
   return Number.isSafeInteger(i.seq)&&i.seq>=0&&i.seq<2**31&&Number.isFinite(i.forward)&&Math.abs(i.forward)<=1&&Number.isFinite(i.strafe)&&Math.abs(i.strafe)<=1&&Number.isFinite(i.yaw)&&Math.abs(i.yaw)<=Math.PI*2&&Number.isFinite(i.pitch)&&Math.abs(i.pitch)<=1.5&&
     ['jump','sprint','fire','reload'].every(k=>typeof (i as any)[k]==='boolean')&&
-    ['crouch','interact'].every(k=>(i as any)[k]===undefined||typeof (i as any)[k]==='boolean')&&(i.weapon==='knife'||i.weapon==='grenade'||i.weapon==='bomb'||Object.hasOwn(WEAPONS,i.weapon));
+    ['crouch','interact','spray'].every(k=>(i as any)[k]===undefined||typeof (i as any)[k]==='boolean')&&(i.weapon==='knife'||i.weapon==='grenade'||i.weapon==='bomb'||Object.hasOwn(WEAPONS,i.weapon));
 }
 export const heightOf=(p:{crouched?:boolean})=>p.crouched?CROUCH_HEIGHT:HEIGHT;
 export const eyeOf=(p:{crouched?:boolean})=>p.crouched?CROUCH_EYE:EYE;
@@ -161,4 +162,21 @@ export function plantSite(p:Vec3,mapId:MapId,team?:Team){return MAPS[mapId].bomb
 export function canReachBomb(p:Vec3,bomb:Vec3,solids:Solid[]){
   const from={x:p.x,y:p.y+.9,z:p.z},to={x:bomb.x,y:bomb.y+.15,z:bomb.z},dx=to.x-from.x,dy=to.y-from.y,dz=to.z-from.z,d=Math.hypot(dx,dy,dz);
   return d<=BOMB_RULES.range&&(d<.01||wallDistance(from,{x:dx/d,y:dy/d,z:dz/d},solids)>=d-.03);
+}
+
+/** Authoritative spray ray: nearby walls, floors, boxes and vehicle surfaces. */
+export function sprayTarget(origin:Vec3,dir:Vec3,solids:Solid[]):{position:Vec3;normal:Vec3;size:number;ray:{origin:Vec3;direction:Vec3}}|undefined{
+ let distance=4,solid:Solid|undefined;
+ for(const b of solids){const hit=raySolid(origin,dir,b);if(hit!==null&&hit>0&&hit<distance){distance=hit;solid=b;}}
+ if(!solid||!['wall','floor','crate'].includes(solid.kind)||solid.style==='door')return;
+ const position={x:origin.x+dir.x*distance,y:origin.y+dir.y*distance,z:origin.z+dir.z*distance},b=solid;
+ const normals:Vec3[]=[];
+ if(Math.abs(position.y-solidTop(b,position))<.001){const slope=b.ramp?(b.ramp.to-b.ramp.from)/(b.ramp.axis==='x'?b.w:b.d):0;normals.push({x:b.ramp?.axis==='x'?-slope:0,y:1,z:b.ramp?.axis==='z'?-slope:0});}
+ const points=b.polygon??[[b.x-b.w/2,b.z-b.d/2],[b.x+b.w/2,b.z-b.d/2],[b.x+b.w/2,b.z+b.d/2],[b.x-b.w/2,b.z+b.d/2]];
+ for(let i=0;i<points.length;i++){const a=points[i],c=points[(i+1)%points.length],dx=c[0]-a[0],dz=c[1]-a[1],length=Math.hypot(dx,dz);if(Math.abs((position.x-a[0])*dz-(position.z-a[1])*dx)/length<.001)normals.push({x:dz/length,y:0,z:-dx/length});}
+ let normal=normals.sort((a,b)=>Math.abs(b.x*dir.x+b.y*dir.y+b.z*dir.z)-Math.abs(a.x*dir.x+a.y*dir.y+a.z*dir.z))[0];if(!normal)return;
+ const length=Math.hypot(normal.x,normal.y,normal.z);normal={x:normal.x/length,y:normal.y/length,z:normal.z/length};
+ if(normal.x*dir.x+normal.y*dir.y+normal.z*dir.z>0)normal={x:-normal.x,y:-normal.y,z:-normal.z};
+ if(normal.y<-.1)return;
+ return {position,normal,size:b.vehicle ? 0.55 : b.kind==='crate' ? Math.min(1.15,b.h*.8,b.w*.8,b.d*.8) : 1.15,ray:{origin:{...origin},direction:{...dir}}};
 }

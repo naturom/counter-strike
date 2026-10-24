@@ -3,7 +3,7 @@ import {RECORDED_AUDIO,RecordedAudio} from '../apps/web/components/recorded-audi
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {combatSignal,soundDuration,spatialMix,FootstepTracker,surfaceAt,type SynthSoundKind,isRecordedKind} from '../apps/web/components/combat-audio';
-import {WEAPONS,type Motion,type Solid,type Weapon} from '@sirocco/shared';
+import {DUST2,dustPoint,groundAt,WEAPONS,type Motion,type Solid,type Weapon} from '@sirocco/shared';
 const origin={x:0,y:1.6,z:0};
 test('combat sounds have finite bounded samples, clean endpoints, distinct weapon reports and variations',()=>{
  const kinds:SynthSoundKind[]=['rifle','pistol','smg','marksman'];
@@ -49,4 +49,33 @@ test('knife swing, player hit and wall contact use distinct recordings with mult
  for(const kind of ['knife','knife-hit','knife-wall'] as const){assert.ok(isRecordedKind(kind));const files=RECORDED_AUDIO[kind]!;assert.ok(files.length>=2);assert.notDeepEqual(wav(files[0]).samples,wav(files[1]).samples);}
  assert.notDeepEqual(wav(RECORDED_AUDIO.knife![0]).samples,wav(RECORDED_AUDIO['knife-hit']![0]).samples);
  assert.notDeepEqual(wav(RECORDED_AUDIO['knife-hit']![0]).samples,wav(RECORDED_AUDIO['knife-wall']![0]).samples);
+});
+
+test('asphalt has a dedicated recording without bleeding onto adjacent stone',()=>{
+ const stone:Solid={x:0,y:3.65,z:-1,w:8,h:.3,d:2,kind:'floor',style:'tile'};
+ const asphalt:Solid={x:0,y:3.65,z:1,w:8,h:.3,d:2,kind:'floor',style:'road'};
+ for(const z of [-1,-.03,-.001,0,.001,.03,1])assert.equal(surfaceAt({x:0,y:3.8,z},[stone,asphalt]),z<=0?'stone':'asphalt',`wrong sound at ${z}`);
+ // A neighbouring metal platform must not colour the ground under the centre.
+ const metal={...asphalt,style:'metal' as const};
+ assert.equal(surfaceAt({x:0,y:3.8,z:-.01},[stone,metal]),'stone');
+ assert.equal(surfaceAt({x:0,y:3.8,z:.01},[stone,metal]),'metal');
+});
+
+test('A Long asphalt uses dedicated footsteps while the adjacent A site stays stone',()=>{
+ for(const u of [880,900,920])for(const v of [145,149.9,150,150.1,165,190,214.9,215.1,240]){
+  const p=dustPoint(u,v);p.y=groundAt(p,DUST2.solids);
+  assert.equal(surfaceAt(p,DUST2.solids),v<150?'stone':'asphalt',`A Long visible surface mismatch at ${u},${v}`);
+ }
+ for(const [u,v] of [[820,140],[820,170],[820,190]]){const p=dustPoint(u,v);p.y=groundAt(p,DUST2.solids);assert.equal(surfaceAt(p,DUST2.solids),'stone',`A paving mismatch at ${u},${v}`);}
+});
+
+test('overlapping floor audio uses the visible first-authored surface at equal heights',()=>{
+ const stone:Solid={x:0,y:3.65,z:0,w:8,h:.3,d:8,kind:'floor',style:'tile'},road={...stone,style:'road' as const};
+ assert.equal(surfaceAt({x:0,y:3.8,z:0},[stone,road]),'stone');
+ assert.equal(surfaceAt({x:0,y:3.8,z:0},[road,stone]),'asphalt');
+});
+
+test('asphalt uses distinct recorded footfalls from both cobblestone and grit',()=>{
+ assert.ok(isRecordedKind('step-asphalt'));
+ for(let i=0;i<4;i++)for(const other of ['stone','grit'] as const)assert.notDeepEqual(wav(RECORDED_AUDIO['step-asphalt']![i]).samples,wav(RECORDED_AUDIO[`step-${other}`]![i]).samples);
 });

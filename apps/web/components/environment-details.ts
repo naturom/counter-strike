@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import type {Solid} from '@sirocco/shared';
+import {groundAt,type Solid} from '@sirocco/shared';
 import type {WorldArt} from './world';
 
 /** Local door axes come from the actual shared collision polygon, not its AABB. */
@@ -57,7 +57,8 @@ export function portalTrim(art:WorldArt,root:THREE.Group,b:Solid,stone:THREE.Mat
  }
 }
 export function streetLamp(art:WorldArt,parent:THREE.Object3D,x:number,base:number,roof:number,metal:THREE.Material){
- art.cylinder(parent,.018,.018,Math.max(.3,roof-base-.65),metal,x,(roof+base)/2-.2,.025);
+ art.cylinder(parent,.018,.018,Math.max(.3,roof-base-.65),metal,x,(roof+base)/2-.2,-.025);
+ for(const y of [base+.35,base+3.40,roof-.65])art.box(parent,.065,.08,.09,metal,x,y,-.015);
  const arm=art.box(parent,.035,.035,.42,metal,x,base+3.45,.18);
  const housing=new THREE.Mesh(new THREE.CylinderGeometry(.10,.18,.10,16),metal);housing.position.set(x,base+3.4,.38);parent.add(housing);
  const glass=new THREE.Mesh(new THREE.CircleGeometry(.145,20),art.trim);glass.rotation.x=Math.PI/2;glass.position.set(x,base+3.345,.38);parent.add(glass);
@@ -82,10 +83,7 @@ export function wallWear(art:WorldArt,parent:THREE.Group,length:number,base:numb
  }
  const geo=new THREE.PlaneGeometry(length,1.9),uv=geo.attributes.uv;for(let i=0;i<uv.count;i++)uv.setX(i,uv.getX(i)*length/4);
  const grime=new THREE.Mesh(geo,stain);grime.position.set(0,base+.95,.009);parent.add(grime);
- if(length<5)return;
- const w=.65+seed%5*.11,h=.32+seed%3*.08,x=-length*.32+(seed%7)*length*.08;
- const shape=new THREE.Shape();shape.moveTo(x-w/2,base+.16);shape.lineTo(x-w*.35,base+h*.6);shape.lineTo(x-w*.17,base+h);shape.lineTo(x+w*.31,base+h*.85);shape.lineTo(x+w/2,base+h*.38);shape.lineTo(x+w*.22,base+.14);shape.closePath();
- const chip=new THREE.Mesh(new THREE.ShapeGeometry(shape),art.stone);chip.position.z=.012;parent.add(chip);
+
 }
 export function rooftopDetails(art:WorldArt,parent:THREE.Group,roof:number,stone:THREE.Material,metal:THREE.Material){
  const tank=art.cylinder(parent,.43,.43,.82,stone,-.7,roof+.45,-1.1);tank.name='Roof water tank';art.cylinder(parent,.46,.46,.06,metal,-.7,roof+.88,-1.1);art.box(parent,.045,.45,.045,metal,-1.12,roof+.23,-1.1);
@@ -122,4 +120,55 @@ export const DUST_ROUTE_SIGNS=[
  {u:435,v:320,y:2.3,text:'B ←',wall:'Lower tunnels block'},
  {u:850,v:318,y:4.3,text:'A ↑',wall:'Catwalk east block'},
  {u:78,v:238,y:4.3,text:'B',wall:'Perimeter'},
+] as const;
+
+/** Thin road paint follows the terrain across slopes and their landing seams. */
+export function roadPaintGeometry(floors:Solid[],x:number,z:number,width:number,length:number){
+ const positions:number[]=[],uv:number[]=[],rows=Math.ceil(length/.08);
+ const point=(side:number,t:number)=>{const px=x+side*width/2,pz=z+(t-.5)*length;return [px,groundAt({x:px,z:pz},floors)+.008,pz];};
+ for(let row=0;row<rows;row++){
+  const a=row/rows,b=(row+1)/rows;
+  for(const [side,t] of [[-1,a],[-1,b],[1,b],[-1,a],[1,b],[1,a]]){positions.push(...point(side,t));uv.push((side+1)/2,t);}
+ }
+ const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));geometry.computeVertexNormals();return geometry;
+}
+
+/** Seat roof-light joists on continuous masonry headers at the two slab edges. */
+export function tunnelRoofFrame(art:WorldArt,parent:THREE.Group,roofs:Solid[],wood:THREE.Material,stone:THREE.Material){
+ const north=roofs.find(b=>b.label==='Upper tunnel roof')!,south=roofs.find(b=>b.label==='Upper tunnel roof south')!;
+ const left=Math.max(north.x-north.w/2,south.x-south.w/2),right=Math.min(north.x+north.w/2,south.x+south.w/2),width=right-left;
+ const near=north.z+north.d/2,far=south.z-south.d/2,ceiling=Math.min(north.y-north.h/2,south.y-south.h/2);
+ const frame=new THREE.Group();frame.name='Upper tunnel roof-light frame';parent.add(frame);
+ for(const edge of [near,far]){
+  const header=art.box(frame,width+.08,.28,.34,stone,(left+right)/2,ceiling-.36,edge,true);header.name='Masonry joist bearing';
+  // Small cap course finishes the roof edge without stacking exposed slab ends.
+  const cap=art.box(frame,width+.08,.13,.20,stone,(left+right)/2,ceiling+.43,edge+(edge===near?-.06:.06),true);cap.name='Roof edge coping';
+ }
+ const bays=Math.max(2,Math.round(width/2.1));
+ for(let i=0;i<bays;i++){
+  const x=left+(i+.5)*width/bays;
+  const beam=art.box(frame,.19,.22,far-near+.26,wood,x,ceiling-.11,(near+far)/2);beam.name='Seated skylight joist';
+ }
+ return frame;
+}
+
+/** Cable endpoints are derived from real façade faces and stay below both roofs. */
+export function facadeCable(art:WorldArt,parent:THREE.Group,wallsA:Solid[],wallsB:Solid[],nearA:{x:number;z:number},nearB:{x:number;z:number},metal:THREE.Material){
+ const a=wallSignMount(wallsA,nearA,.20),b=wallSignMount(wallsB,nearB,.20),height=Math.min(a.wall.y+a.wall.h/2,b.wall.y+b.wall.h/2)-.55;
+ const ends=[a,b].map(m=>{
+  const bracket=new THREE.Group();bracket.position.set(m.x,height,m.z);bracket.rotation.y=m.rotation;parent.add(bracket);
+  art.box(bracket,.12,.18,.10,metal,0,0,-.02);
+  const insulator=art.cylinder(bracket,.035,.035,.12,art.trim,0,0,.065);insulator.rotation.x=Math.PI/2;
+  return new THREE.Vector3(m.x+Math.sin(m.rotation)*.125,height,m.z+Math.cos(m.rotation)*.125);
+ });
+ const length=ends[0].distanceTo(ends[1]),sag=Math.min(1.0,length*.055),points=[];
+ for(let i=0;i<=32;i++){const t=i/32,p=ends[0].clone().lerp(ends[1],t);p.y-=4*t*(1-t)*sag;points.push(p);}
+ const material=new THREE.LineBasicMaterial({color:'#373b35'});art.materials.push(material);
+ const cable=new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),material);cable.name='Wall-mounted utility cable';parent.add(cable);return {cable,mounts:[a,b],height};
+}
+export const DUST_CABLES=[
+ {a:'T spawn island',b:'Long door shop',from:[594,720],to:[735,720]},
+ {a:'Catwalk east block',b:'Perimeter',from:[845,300],to:[963,300]},
+ {a:'Western central block',b:'Mid bazaar',from:[421,610],to:[529,610]},
+ {a:'Perimeter',b:'B east wall north',from:[74,183],to:[250,183]},
 ] as const;

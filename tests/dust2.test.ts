@@ -44,7 +44,7 @@ test('polygon building collisions preserve open space in concave footprints',()=
 
 // These start inside former drop pockets, rather than following only the main lanes.
 const escapes:Record<string,[number,number][]>={
-  'B exit pocket':[[190,390],[190,430],[205,460]],
+  'B exit pocket':[[190,390],[190,350],[220,350],[220,280],[210,230],[110,250],[118,305],[118,385],[118,460],[205,460]],
   'tunnel approach side':[[270,540],[220,540],[205,650]],
   'west Mid edge':[[425,570],[465,570],[465,640]],
   'T island rear':[[465,750],[465,850],[575,850],[625,850],[625,930]],
@@ -91,4 +91,11 @@ test('enclosed tunnel stairs descend on real treads and remain walkable in both 
  for(const points of [[[275,495],[310,495],[310,410],[400,410],[445,410]],[[445,410],[400,410],[310,410],[310,495],[275,495]]] as [number,number][][])walk(points);
  for(const [u,v,y] of [[284,455,4],[310,470,6.7],[430,391,1],[430,433,1]])assert.ok(map.solids.some(b=>intersects(dustPoint(u,v,y),b)),`enclosure gap at ${u},${v}`);
  assert.ok(wallDistance(dustPoint(400,411,1.6),{x:1,y:0,z:0},map.solids)>4,'exit doorway must remain open');
+});
+
+test('B car-side shortcut is sealed across its width while the main tunnel stays open',()=>{
+ const seal=map.solids.find(b=>b.label==='B south passage seal')!;
+ for(const u of [170,185,205,225,245,256])assert.ok(intersects(dustPoint(u,417,3.2),seal),`gap in B seal at ${u}`);
+ const start=dustPoint(205,450,4.8);assert.ok(wallDistance(start,{x:0,y:0,z:-1},[seal])<4,'seal must stop shots as well as players');
+ walk([[205,460],[118,460],[118,385],[118,305],[110,250],[185,220]]);
 });

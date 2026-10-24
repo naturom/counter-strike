@@ -32,3 +32,11 @@ Knife attacks use original 440 ms forehand and backhand animation curves. The bl
 ## Environment detail pass
 
 Doors use the exact orientation, footprint and heights of their shared collision leaves, with individual vertical timber planks, narrow iron straps, two-sided handles and hinge fittings. Mid and Long leaves meet structural jambs; B leaves reach the sloping threshold and retain their previous top elevation. Gate headers and jambs use the shared map geometry. Original plaster weathering, wall chips, floor contact shading, shutter frames, rooftop tanks, antennae, supported awnings, street lamps, vehicle trim and curved palm fronds are code-generated details. Static surfaces are batched by material; texture maps are stored locally.
+
+## Aerosol spray recording
+
+Spray audio uses three edited bursts from [Spray Can.wav by PixaPexelAudio](https://freesound.org/people/PixaPexelAudio/sounds/674984/) under CC0. Downloaded from the public HQ MP3 preview, converted to mono PCM WAV, trimmed, normalized and faded. Bundled in `public/audio/spray`; source and license also appear in audio credits.
+
+## Asphalt footsteps
+
+Dedicated asphalt footsteps use four edited footfalls from [footsteps shoes walk road asphalt hard.flac by kyles](https://freesound.org/people/kyles/sounds/637556/), CC0. The public HQ MP3 preview was converted into mono 22.05 kHz PCM WAV, DC-corrected, trimmed without changing speed, normalized and faded. Cobblestone and grit recordings remain separate.

@@ -1,8 +1,8 @@
-import {footprint,solidTop,type Motion,type Solid,type Vec3,type Weapon} from '@sirocco/shared';
-export type Surface='stone'|'grit'|'metal'|'wood';
+import {footprint,solidTop,RADIUS,type Motion,type Solid,type Vec3,type Weapon} from '@sirocco/shared';
+export type Surface='asphalt'|'stone'|'grit'|'metal'|'wood';
 export type SynthSoundKind=Weapon;
-export type SoundKind=SynthSoundKind|'knife'|'knife-hit'|'knife-wall'|`reload-${Weapon}`|`step-${Surface}`;
-export const isRecordedKind=(kind:SoundKind):kind is Exclude<SoundKind,SynthSoundKind>=>kind.startsWith('step-')||kind.startsWith('reload-')||kind.startsWith('knife');
+export type SoundKind=SynthSoundKind|'spray'|'knife'|'knife-hit'|'knife-wall'|`reload-${Weapon}`|`step-${Surface}`;
+export const isRecordedKind=(kind:SoundKind):kind is Exclude<SoundKind,SynthSoundKind>=>kind==='spray'||kind.startsWith('step-')||kind.startsWith('reload-')||kind.startsWith('knife');
 export function soundDuration(kind:SynthSoundKind){return kind==='marksman'?1.35:.85;}
 /** Layered synthesis is used for gun reports only. Knife sounds, footsteps and
  * reloads use bundled recordings and never fall back to these oscillators. */
@@ -32,10 +32,19 @@ export function combatSignal(rate:number,kind:SynthSoundKind,variant=0){
  return out;
 }
 export function surfaceAt(p:Vec3,solids:Solid[]):Surface{
- let selected:Solid|undefined,top=-Infinity;
- for(const b of solids){const h=solidTop(b,p);if(Math.abs(h-p.y)<.18&&footprint(p,b,.02)&&h>=top){selected=b;top=h;}}
+ // Prefer the surface beneath the foot centre. Radius fallback is needed
+ // when the player is supported by the front edge of a stair or crate.
+ let selected:Solid|undefined;
+ for(const radius of [0,RADIUS]){
+  let top=-Infinity;
+  // Equal-height floor overlaps render their first authored surface. Use the
+  // same owner here rather than letting a later, hidden road override paving.
+  for(const b of solids){const h=solidTop(b,p);if(Math.abs(h-p.y)<.18&&footprint(p,b,radius)&&h>top+1e-5){selected=b;top=h;}}
+  if(selected)break;
+ }
  if(selected?.style==='metal')return 'metal';if(selected?.kind==='crate'||selected?.style==='door')return 'wood';
- return !selected||selected.style==='road'?'grit':'stone';
+ // Roads have dedicated asphalt recordings; paving keeps its stone sound.
+ return !selected?'grit':selected.style==='road'?'asphalt':'stone';
 }
 export function spatialMix(listener:Vec3,yaw:number,at:Vec3|undefined,range:number,occluded=false){
  if(!at)return {gain:1,pan:0,cutoff:18000,delay:0};

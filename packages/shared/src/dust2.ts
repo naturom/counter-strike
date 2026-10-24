@@ -56,6 +56,8 @@ rect('B east wall south',254,268,9,57,8,0,'wall','kasbah');
 wall('B exit angled wall',[254,325],[210,370],6,0);
 rect('B tunnel east',138,327,32,90,7.8,0,'wall','kasbah');
 rect('B tunnel west',66,327,32,87,7.8,0,'wall','kasbah');
+// Close the extra upper-tunnel shortcut beside the car; retain the main B tunnel.
+rect('B south passage seal',170,414,86,6,7.8,0,'wall','kasbah');
 poly('Lower tunnels block',[[267,266],[428,266],[428,386],[286,386],[286,437],[256,437],[256,326]],8.2,0,'kasbah');
 poly('Tunnel south block',[[66,502],[170,502],[170,576],[139,576],[139,610],[90,610],[90,616],[66,616]],8,0,'kasbah');
 poly('Western central block',[[330,437],[439,437],[439,536],[418,536],[418,618],[394,618],[406,691],[446,691],[446,878],[344,878],[344,773],[300,773],[300,500],[330,500]],9.2,0,'kasbah');
@@ -95,7 +97,7 @@ ramp('B exit return',170,370,116,44,'z',2,3.2);
 ramp('B doors threshold',254,220,65,58,'x',2,0);
 // Enclosed stone flight: actual walkable treads shared by rendering and movement.
 for(let step=0;step<16;step++)floor(`Tunnel stair tread ${step+1}`,286,438+step*3.5,44,3.5,.3+(step+1)*2.9/16,'tile');
-rect('Tunnel stairwell west',282,436,4,48,6.6,0,'wall','kasbah');
+rect('Tunnel stairwell west',282,437,4,47,6.6,0,'wall','kasbah');
 rect('Tunnel stairwell ceiling',282,438,48,64,.35,6.6,'roof','kasbah');
 floor('Tunnel stair landing',286,494,44,8,3.2);
 floor('Lower tunnels',286,386,160,52,.3);
@@ -165,7 +167,6 @@ rect('Lower tunnel roof',286,386,142,52,.45,3.4,'roof','kasbah');
 rect('Lower tunnel exit north jamb',428,386,8,12,3.4,0,'wall','kasbah');
 rect('Lower tunnel exit south jamb',428,426,8,12,3.4,0,'wall','kasbah');
 rect('Lower tunnel gate lintel',428,398,8,28,.5,2.9,'roof','kasbah');
-wall('Lower tunnel exit door',[430,398],[447,398],2.75,0,'door',1.5);
 crate('Xbox',451,401,28,26,1.55,0);
 crate('B default',180,145,21,22,1.45,2.65);
 crate('B double stack',220,119,25,28,2.55,2.65);

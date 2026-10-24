@@ -4,7 +4,7 @@ import {DUST2,dustPoint,DUST_SCALE} from '@sirocco/shared';
 import {solidTop,groundAt,type Solid} from '@sirocco/shared';
 import type {WorldArt} from './world';
 import {solidGeometry,visibleFloorGeometry} from './map-geometry';
-import {buildDoor,weatherWall,portalTrim,streetLamp,roundedBox,palmFrond,wallWear,rooftopDetails,groundContact,wallSignMount,DUST_ROUTE_SIGNS} from './environment-details';
+import {buildDoor,weatherWall,portalTrim,streetLamp,roundedBox,palmFrond,wallWear,rooftopDetails,groundContact,wallSignMount,DUST_ROUTE_SIGNS,roadPaintGeometry,tunnelRoofFrame,facadeCable,DUST_CABLES} from './environment-details';
 
 export function buildDust(art:WorldArt){
   const root=new THREE.Group();root.name='Dust II';
@@ -17,12 +17,18 @@ export function buildDust(art:WorldArt){
   const box=(w:number,h:number,d:number,m:THREE.Material,x:number,y:number,z:number)=>art.box(root,w,h,d,m,x,y,z);
   const material=(b:Solid)=>b.style==='door'?gateWood:b.kind==='floor'&&(b.label?.startsWith('Tunnel stair')||b.label?.startsWith('Lower tunnel'))?art.stone:b.style==='road'?road:b.style==='tile'||b.label==='B plant platform'?paving:b.style==='metal'?blue:b.kind==='crate'?crateWood:b.kind==='floor'?art.sand:b.style==='kasbah'?(b.x<-20?clay:ochre):b.style==='plaster'?(b.z>5?chalk:plaster):art.stone;
   art.box(root,230,.25,230,art.sand,0,-.43,0,true);
+  // Reserve unobstructed masonry at cable brackets; no window may sit behind one.
+  const cableAnchors=DUST_CABLES.flatMap(c=>{
+    const a=wallSignMount(DUST2.solids.filter(b=>b.label===c.a),dustPoint(c.from[0],c.from[1]),.20),b=wallSignMount(DUST2.solids.filter(b=>b.label===c.b),dustPoint(c.to[0],c.to[1]),.20),y=Math.min(a.wall.y+a.wall.h/2,b.wall.y+b.wall.h/2)-.55;
+    return [{...a,y},{...b,y}];
+  });
   const floors=DUST2.solids.filter(b=>b.kind==='floor');
+  const stairWalls=DUST2.solids.filter(b=>['Tunnel stairwell west','Lower tunnels block','Western central block'].includes(b.label??''));
   for(const b of DUST2.solids){
     // Vehicles have individually modelled bodies matching these collision bounds.
     if(b.vehicle)continue;
     if(b.style==='door'){root.add(buildDoor(art,b,gateWood,iron));continue;}
-    const geometry=b.kind==='floor'?visibleFloorGeometry(b,floors):solidGeometry(b);
+    const geometry=b.kind==='floor'?visibleFloorGeometry(b,floors,stairWalls):solidGeometry(b);
     if(b.style==='road'){const uv=geometry.attributes.uv;for(let i=0;i<uv.count;i++)uv.setXY(i,uv.getX(i)*.5,uv.getY(i)*.5);}
     if(b.kind==='wall')weatherWall(geometry,b,groundAt({x:b.x,z:b.z},floors));
     const mesh=new THREE.Mesh(geometry,material(b));mesh.castShadow=b.kind!=='floor';mesh.receiveShadow=true;root.add(mesh);
@@ -59,7 +65,9 @@ export function buildDust(art:WorldArt){
       const windowSpan=Math.min(length-3,(windowCount-1)*4.8);
       for(let bay=0;bay<windowCount;bay++){
         const x=windowCount===1?((facadeSeed%3)-1)*Math.min(.6,length*.08):-windowSpan/2+bay*windowSpan/(windowCount-1);
-        const y=Math.max(base+2.3,roof-2.1);art.box(group,.98,1.49,.08,art.trim,x,y,.015);art.box(group,.80,1.30,.045,glass,x,y,.067);
+        const y=Math.max(base+2.3,roof-2.1),wx=group.position.x+Math.cos(group.rotation.y)*x,wz=group.position.z-Math.sin(group.rotation.y)*x;
+        if(cableAnchors.some(a=>Math.hypot(a.x-wx,a.z-wz)<1.05&&Math.abs(a.y-y)<1.05))continue;
+        art.box(group,.98,1.49,.08,art.trim,x,y,.015);art.box(group,.80,1.30,.045,glass,x,y,.067);
         for(const side of [-1,1]){art.box(group,.035,1.28,.045,teal,x+side*.36,y,.105);for(let j=0;j<10;j++){const slat=art.box(group,.335,.084,.038,teal,x+side*.18,y-.55+j*.12,.11);slat.rotation.x=.16;}}
         art.box(group,.035,1.30,.05,teal,x,y,.11);
         art.box(group,1.10,.09,.28,art.trim,x,y-.77,.08);
@@ -94,12 +102,12 @@ export function buildDust(art:WorldArt){
     const p=dustPoint(u,v);box(3.8,12,3.8,clay,p.x,6,p.z);box(4,.25,4,ochre,p.x,11.8,p.z);
     for(let k=0;k<4;k++)box(.45,.6,.65,ochre,p.x-1.4+k*.95,12.25,p.z+1.65);
   }
-  for(const [u,v,y,w,rot] of [[118,327,3.2,4.3,0],[160,414,3.2,5,0],[300,410,.3,3.8,Math.PI/2],[466,359,0,8.1,0],[710,553,2.1,5.8,0],[710,670,2.1,5.8,0]] as number[][]){const p=dustPoint(u,v);arch(root,p.x,y,p.z,w,3.3,ochre,rot);}
-  // Tunnel roof joists and a sunlit broken opening rather than pitch-black rooms.
-  for(let u=75;u<280;u+=19){const p=dustPoint(u,458);box(.14,.18,8.8,art.wood,p.x,6.65,p.z);}
+  for(const [u,v,y,w,rot] of [[118,327,3.2,4.3,0],[160,414,3.2,5,0],[466,359,0,8.1,0],[710,553,2.1,5.8,0],[710,670,2.1,5.8,0]] as number[][]){const p=dustPoint(u,v);arch(root,p.x,y,p.z,w,3.3,ochre,rot);}
+  // A framed roof light: short joists seat on headers at the actual slab edges.
+  tunnelRoofFrame(art,root,DUST2.solids,gateWood,art.stone);
   for(let v=343;v<414;v+=20){const p=dustPoint(118,v);box(4.5,.18,.14,art.wood,p.x,6.55,p.z);}
   // Street-front shutters, awnings and signs around Long and Top Mid.
-  for(const [u,v,text,color] of [[758,583,'SALON DE COIFFURE','#517a76'],[789,690,'TÉLÉBOUTIQUE','#4a7181'],[553,626,'MARCHÉ DU SOLEIL','#a7664b'],[365,878,'CAFÉ DU SUD','#7a7760']] as const){
+  for(const [u,v,text,color] of [[758,583,'SALON DE COIFFURE','#517a76'],[789,690,'TÉLÉBOUTIQUE','#4a7181'],[553,626,'MARCHÉ DU SOLEIL','#a7664b']] as const){
     const p=dustPoint(u,v);const y=v>800?3.2:v>580?2.1:0;
     box(2.8,2.7,.08,iron,p.x,y+1.35,p.z+.07);
     for(let k=0;k<18;k++)box(2.75,.035,.04,art.trim,p.x,y+.12+k*.145,p.z+.13);
@@ -115,16 +123,15 @@ export function buildDust(art:WorldArt){
     const mount=wallSignMount(DUST2.solids.filter(b=>b.label===sign.wall),dustPoint(sign.u,sign.v),1.8);
     art.sign(root,sign.text,mount.x,sign.y,mount.z,mount.rotation,'#aa604b',1.8);
   }
-  // Curbs and painted lane boundaries track the Long slope.
-  for(let v=155;v<500;v+=12){const p=dustPoint(920,v),y=v<215?3.8-(v-150)/65*1.7:2.1;box(.22,.11,1.25,(v/12|0)%2?chalk:red,p.x,y+.05,p.z);}
+  // Painted lane edge conforms to the road, including the ramp/landing join.
+  const laneWhite=art.material('#d8d3c5',{roughness:1,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1}),laneRed=art.material('#aa5847',{roughness:1,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1});
+  for(let v=155;v<500;v+=12){const p=dustPoint(920,v),paint=new THREE.Mesh(roadPaintGeometry(floors,p.x,p.z,.22,1.25),(v/12|0)%2?laneWhite:laneRed);paint.receiveShadow=true;root.add(paint);}
   // Palms are outside routes, with compact trunks kept outside shared bounds.
   for(const [u,v,y] of [[800,-20,14.05],[850,-20,14.05],[51,260,0],[42,715,0],[977,365,0],[956,85,0]])palm(u,v,y);
   // Skyline behind the courtyard walls; deterministic variation avoids regeneration flicker.
   for(let i=0;i<19;i++){const x=-80+i*9,h=8+(i*7%11),z=-67-(i%3)*5;box(7.6,h,9,i%3?plaster:ochre,x,h/2,z);box(7.9,.25,9.3,art.trim,x,h,z);for(let k=0;k<3;k++)box(.8,1.4,.08,glass,x-2.4+k*2.4,h-2,z+4.55);}
   const minaret=dustPoint(355,-70);art.cylinder(root,1.7,2.1,24,chalk,minaret.x,12,minaret.z);art.cylinder(root,2.7,2.7,.6,art.trim,minaret.x,21,minaret.z);const dome=new THREE.Mesh(new THREE.SphereGeometry(1.8,18,10,0,Math.PI*2,0,Math.PI/2),teal);dome.position.set(minaret.x,24,minaret.z);root.add(dome);
-  for(const [u1,v1,u2,v2,y] of [[680,710,739,710,10],[845,300,968,300,10],[435,610,530,610,9],[78,183,263,183,11]]){
-    const a=dustPoint(u1,v1),b=dustPoint(u2,v2),points=[];for(let i=0;i<=24;i++){const t=i/24;points.push(new THREE.Vector3(a.x+(b.x-a.x)*t,y-Math.sin(t*Math.PI)*1.1,a.z+(b.z-a.z)*t));}const mat=new THREE.LineBasicMaterial({color:'#373b35'});art.materials.push(mat);root.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),mat));
-  }
+  for(const cable of DUST_CABLES)facadeCable(art,root,DUST2.solids.filter(b=>b.label===cable.a),DUST2.solids.filter(b=>b.label===cable.b),dustPoint(cable.from[0],cable.from[1]),dustPoint(cable.to[0],cable.to[1]),iron);
   for(const pickup of DUST2.pickups){box(1.2,.18,.7,art.dark,pickup.x,pickup.y+.09,pickup.z);box(1.25,.04,.75,iron,pickup.x,pickup.y+.2,pickup.z);}
   return root;
 
