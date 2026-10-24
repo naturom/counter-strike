@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {DT,RADIUS,type AvatarId,sprayTarget,type Spray,BOMB_RULES,plantSite,canReachBomb,footprint,solidTop,intersects,ROUND_MS,WIN_SCORE,MAPS,DEFAULT_MAP,WEAPONS,KNIFE,isGun,direction,move,neutralInput,rayBox,wallDistance,heightOf,eyeOf,nearestPickup,type Input,type Player,type Snapshot,type CombatEvent,type Solid,type Team,type MapId,type Pickup,type Grenade,type Equipment,type Vec3,type GameMode,type BombState} from '@sirocco/shared';
+import {DT,RADIUS,type AvatarId,sprayTarget,type Spray,BOMB_RULES,plantSite,canReachBomb,footprint,solidTop,intersects,ROUND_MS,WIN_SCORE,MAPS,DEFAULT_MAP,WEAPONS,KNIFE,isGun,direction,move,neutralInput,rayBox,rayPlayer,type HitZone,wallDistance,heightOf,eyeOf,nearestPickup,type Input,type Player,type Snapshot,type CombatEvent,type Solid,type Team,type MapId,type Pickup,type Grenade,type Equipment,type Vec3,type GameMode,type BombState} from '@sirocco/shared';
 const freshAmmo=()=>({rifle:30,pistol:12,smg:0,marksman:0});
 export class Simulation {
   players=new Map<string,Player>();
@@ -84,24 +84,25 @@ export class Simulation {
   }
   fire(p:Player){
     if(p.weapon==='grenade'||p.weapon==='bomb')return;const w=p.weapon==='knife'?KNIFE:WEAPONS[p.weapon];if(isGun(p.weapon))p.ammo[p.weapon]--;this.nextShot.set(p.id,this.time+w.interval);p.protectedUntil=0;
-    const from=this.eye(p),dir=direction(p.yaw,p.pitch);let distance=Math.min(p.weapon==='knife'?KNIFE.range:150,wallDistance(from,dir,this.solids)),target:Player|undefined;
+    const from=this.eye(p),dir=direction(p.yaw,p.pitch);let distance=Math.min(p.weapon==='knife'?KNIFE.range:150,wallDistance(from,dir,this.solids)),target:Player|undefined,hitZone:HitZone|undefined;
     for(const other of this.players.values()){
       if(other.id===p.id||other.hp<=0)continue;
-      const t=rayBox(from,dir,{x:other.x-RADIUS,y:other.y,z:other.z-RADIUS},{x:other.x+RADIUS,y:other.y+heightOf(other),z:other.z+RADIUS});
-      if(t!==null&&t<distance){distance=t;target=other;}
+      const result=p.weapon==='knife'?null:rayPlayer(from,dir,other);
+      const t=p.weapon==='knife'?rayBox(from,dir,{x:other.x-RADIUS,y:other.y,z:other.z-RADIUS},{x:other.x+RADIUS,y:other.y+heightOf(other),z:other.z+RADIUS}):result?.distance??null;
+      if(t!==null&&t<distance){distance=t;target=other;hitZone=result?.zone;}
     }
     const to={x:from.x+dir.x*distance,y:from.y+dir.y*distance,z:from.z+dir.z*distance};
     const hit=target&&target.team!==p.team&&target.protectedUntil<=this.time?target:undefined;
-    this.emit(p.weapon==='knife'?'melee':'shot',p,p.weapon,from,to,{target:hit?.id});if(hit)this.damage(hit,w.damage,p,p.weapon,from);
+    this.emit(p.weapon==='knife'?'melee':'shot',p,p.weapon,from,to,{target:hit?.id,hitZone:hit?hitZone:undefined});if(hit)this.damage(hit,hitZone==='head'?hit.hp:w.damage,p,p.weapon,from,hitZone);
   }
-  damage(victim:Player,amount:number,attacker:{id:string;team:Team},weapon:Equipment,from:Vec3){
+  damage(victim:Player,amount:number,attacker:{id:string;team:Team},weapon:Equipment,from:Vec3,hitZone?:HitZone){
     if(this.phase!=='playing'||victim.hp<=0||victim.protectedUntil>this.time||victim.team===attacker.team&&victim.id!==attacker.id)return;
     const dealt=Math.min(victim.hp,Math.max(0,Math.round(amount)));if(!dealt)return;victim.hp-=dealt;
-    this.emit('damage',attacker,weapon,from,this.eye(victim),{target:victim.id,damage:dealt,hp:victim.hp});
+    this.emit('damage',attacker,weapon,from,this.eye(victim),{target:victim.id,damage:dealt,hp:victim.hp,hitZone});
     if(!victim.hp){
       this.dropBomb(victim.id);victim.deaths++;victim.respawnAt=this.time+3000;victim.reloadUntil=0;
       const killer=this.players.get(attacker.id);if(victim.team!==attacker.team){if(killer)killer.kills++;if(this.mode==='deathmatch')this.scores[attacker.team]++;}
-      this.emit('kill',attacker,weapon,from,victim,{target:victim.id,name:killer?.name??'Departed player',victim:victim.name});
+      this.emit('kill',attacker,weapon,from,victim,{target:victim.id,name:killer?.name??'Departed player',victim:victim.name,hitZone});
       if(this.mode==='deathmatch'&&this.scores[attacker.team]>=WIN_SCORE)this.finish();
     }
   }

@@ -66,7 +66,8 @@ export interface Player extends Motion {avatar:AvatarId;id:string;name:string;te
 export interface Grenade extends Vec3 {id:number;owner:string;team:Team;vx:number;vy:number;vz:number;explodeAt:number;}
 export interface Spray {id:number;owner:string;position:Vec3;normal:Vec3;size?:number;ray?:{origin:Vec3;direction:Vec3};expiresAt:number;}
 export interface Snapshot {sprays:Spray[];mode:GameMode;bomb:BombState|null;bombs:BombState[];roundLive:boolean;outcome:string;mapId:MapId;matchId:string;round:number;time:number;endsAt:number;phase:'playing'|'finished';winner:Team|'draw'|null;scores:Record<Team,number>;players:Player[];pickups:Pickup[];grenades:Grenade[];}
-export interface CombatEvent {type:'spray'|'shot'|'melee'|'kill'|'damage'|'reload'|'pickup'|'grenade'|'explosion'|'bombPlant'|'bombDefuse'|'bombAction';id:number;shooter:string;target?:string;name?:string;victim?:string;team:Team;weapon:Equipment;from:Vec3;to:Vec3;damage?:number;hp?:number;}
+export type HitZone = 'head'|'body';
+export interface CombatEvent {type:'spray'|'shot'|'melee'|'kill'|'damage'|'reload'|'pickup'|'grenade'|'explosion'|'bombPlant'|'bombDefuse'|'bombAction';id:number;shooter:string;target?:string;name?:string;victim?:string;team:Team;weapon:Equipment;from:Vec3;to:Vec3;damage?:number;hp?:number;hitZone?:HitZone;}
 export function validInput(value:unknown):value is Input {
   if(!value||typeof value!=='object')return false;const i=value as Input;
   return Number.isSafeInteger(i.seq)&&i.seq>=0&&i.seq<2**31&&Number.isFinite(i.forward)&&Math.abs(i.forward)<=1&&Number.isFinite(i.strafe)&&Math.abs(i.strafe)<=1&&Number.isFinite(i.yaw)&&Math.abs(i.yaw)<=Math.PI*2&&Number.isFinite(i.pitch)&&Math.abs(i.pitch)<=1.5&&
@@ -137,6 +138,20 @@ export function move(p:Motion,i:Input,solids:Solid[]=SOLIDS):Motion {
 }
 export function rayBox(origin:Vec3,dir:Vec3,min:Vec3,max:Vec3):number|null {
   let lo=0,hi=150;for(const a of ['x','y','z'] as const){if(Math.abs(dir[a])<1e-8){if(origin[a]<min[a]||origin[a]>max[a])return null;continue;}let t1=(min[a]-origin[a])/dir[a],t2=(max[a]-origin[a])/dir[a];if(t1>t2)[t1,t2]=[t2,t1];lo=Math.max(lo,t1);hi=Math.min(hi,t2);if(lo>hi)return null;}return lo;
+}
+/** Avatar-independent gun hitboxes, scaled with the same crouch height as the model. */
+export function rayPlayer(origin:Vec3,dir:Vec3,p:Motion):{distance:number;zone:HitZone}|null {
+  const scale=heightOf(p)/HEIGHT;
+  const body=rayBox(origin,dir,{x:p.x-RADIUS,y:p.y,z:p.z-RADIUS},{x:p.x+RADIUS,y:p.y+1.5*scale,z:p.z+RADIUS});
+  // An ellipsoid avoids awarding headshots in the empty corners beside the head.
+  const radii={x:.14,y:.15*scale,z:.14},center={x:p.x,y:p.y+1.65*scale,z:p.z};
+  let a=0,b=0,c=-1;
+  for(const axis of ['x','y','z'] as const){const o=(origin[axis]-center[axis])/radii[axis],d=dir[axis]/radii[axis];a+=d*d;b+=2*o*d;c+=o*o;}
+  const disc=b*b-4*a*c;
+  let head:number|null=null;
+  if(a>0&&disc>=0){const near=(-b-Math.sqrt(disc))/(2*a),far=(-b+Math.sqrt(disc))/(2*a);if(far>=0)head=Math.max(0,near);}
+  if(head!==null&&head<=150&&(body===null||head<body))return {distance:head,zone:'head'};
+  return body===null?null:{distance:body,zone:'body'};
 }
 /** Exact ray intersections for extruded polygons and ramp top planes. */
 export function raySolid(origin:Vec3,dir:Vec3,b:Solid):number|null {
