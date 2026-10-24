@@ -21,7 +21,7 @@ export function addRealAnatomy(root:THREE.Group,art:WorldArt,id:AvatarId,materia
  for(const data of anatomy.variants[variant]){
   if(data.role!=='Skin'&&!hasFace)continue;
   if(['Tongue','Teeth','Cornea'].includes(data.role))continue;
-  let g=anatomyGeometry(data);if(data.part.endsWith('Leg')&&data.role==='Skin'){const p=g.attributes.position,xs:number[]=[],zs:number[]=[];for(let i=0;i<p.count;i++)if(p.getY(i)<.15){xs.push(p.getX(i));zs.push(p.getZ(i));}root.userData.feet??={};root.userData.feet[data.part]={x:(Math.min(...xs)+Math.max(...xs))/2,z:(Math.min(...zs)+Math.max(...zs))/2};if(!['hulk','groot'].includes(id))g=cutGeometryY(g,.17);}if((unmasked||partial)&&data.role==='Skin'&&data.part==='body')g=cutGeometryY(g,partial?1.635:1.51);if(id==='ironman'&&data.role==='Skin')for(const y of [.46,.72,1.03,1.15])g=cutGeometryY(g,y);if(id==='spiderman'&&data.role==='Skin')for(const y of [.38,1.07,1.10,1.30])g=cutGeometryY(g,y);const pos=g.attributes.position;
+  let g=anatomyGeometry(data);if(data.part.endsWith('Leg')&&data.role==='Skin'){const p=g.attributes.position,xs:number[]=[],zs:number[]=[];for(let i=0;i<p.count;i++)if(p.getY(i)<.15){xs.push(p.getX(i));zs.push(p.getZ(i));}root.userData.feet??={};root.userData.feet[data.part]={x:(Math.min(...xs)+Math.max(...xs))/2,z:(Math.min(...zs)+Math.max(...zs))/2};if(!['hulk','groot'].includes(id))g=cutGeometryY(g,.17);}if((unmasked||partial)&&data.role==='Skin'&&data.part==='body')g=cutGeometryY(g,partial?1.635:1.51);if(id==='ironman'&&data.role==='Skin')for(const y of [.46,.72,1.03,1.15,1.49])g=cutGeometryY(g,y);if(id==='spiderman'&&data.role==='Skin')for(const y of [.38,1.07,1.10,1.30])g=cutGeometryY(g,y);const pos=g.attributes.position;
   // Smooth the fitted suit at the pelvis; it is clothing, rather than exposed anatomy.
   if(id!=='groot')for(let i=0;i<pos.count;i++){const x=pos.getX(i),y=pos.getY(i),z=pos.getZ(i);if(y>.76&&y<1.01&&Math.abs(x)<.10&&z<-.085)pos.setZ(i,Math.max(z,-.103));}
   if(id==='hulk')for(let i=0;i<pos.count;i++){const y=pos.getY(i);pos.setX(i,pos.getX(i)*(y>1.05?1.22:1.08));}
@@ -40,6 +40,7 @@ export function addRealAnatomy(root:THREE.Group,art:WorldArt,id:AvatarId,materia
     if(id==='deadpool'&&Math.abs(x)>.14&&y>.94&&y<1.32)slot=2;
     if(id==='black-widow'&&Math.abs(x)<.012&&y>1.02&&y<1.40&&z<0)slot=1;
     if(id==='ironman'&&(y>.46&&y<.72||y>1.03&&y<1.15))slot=1;
+    if(id==='ironman'&&data.part.includes('Arm'))slot=y>1.21&&y<1.30?1:0;
     const list=sections.get(slot)??[];list.push(...tri);sections.set(slot,list);
    }
    const sorted:number[]=[];for(const [slot,index]of sections){g.addGroup(sorted.length,index.length,slot);sorted.push(...index);}g.setIndex(sorted);

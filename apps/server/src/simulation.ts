@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {DT,RADIUS,SCOUT_TOWER,type AvatarId,sprayTarget,type Spray,BOMB_RULES,plantSite,canReachBomb,footprint,solidTop,intersects,ROUND_MS,WIN_SCORE,MAPS,DEFAULT_MAP,WEAPONS,KNIFE,isGun,direction,move,neutralInput,rayBox,rayPlayer,type HitZone,wallDistance,heightOf,eyeOf,nearestPickup,type Input,type Player,type Snapshot,type CombatEvent,type Solid,type Team,type MapId,type Pickup,type Grenade,type Equipment,type Vec3,type GameMode,type BombState} from '@sirocco/shared';
+import {DT,RADIUS,SCOUT_TOWER,validAvatar,type AvatarId,sprayTarget,type Spray,BOMB_RULES,plantSite,canReachBomb,footprint,solidTop,intersects,ROUND_MS,WIN_SCORE,MAPS,DEFAULT_MAP,WEAPONS,KNIFE,isGun,direction,move,neutralInput,rayBox,rayPlayer,type HitZone,wallDistance,heightOf,eyeOf,nearestPickup,type Input,type Player,type Snapshot,type CombatEvent,type Solid,type Team,type MapId,type Pickup,type Grenade,type Equipment,type Vec3,type GameMode,type BombState} from '@sirocco/shared';
 const freshAmmo=()=>({rifle:30,pistol:12,smg:0,marksman:0});
 export class Simulation {
   players=new Map<string,Player>();
@@ -20,7 +20,8 @@ export class Simulation {
   readonly mapId:MapId;
   solids:Solid[];pickups:Pickup[];grenades:Grenade[]=[];
   constructor(mapOrSolids:MapId|Solid[]=DEFAULT_MAP,readonly mode:GameMode='deathmatch'){this.mapId=typeof mapOrSolids==='string'?mapOrSolids:'relay';this.solids=typeof mapOrSolids==='string'?MAPS[mapOrSolids].solids:mapOrSolids;this.pickups=MAPS[this.mapId].pickups.map(p=>({...p}));if(mode==='defusal'){if(this.mapId!=='dunes')throw new Error('Bomb Defusal requires Dust III');this.endsAt=0;this.resetBomb();}}
-  add(id:string,name:string,avatar:AvatarId='operator'):Player {
+  add(id:string,name:string,avatar:AvatarId='ironman'):Player {
+    avatar=validAvatar(avatar)?avatar:'ironman';
     if(this.players.size>=8)throw new Error('Room full (8/8).');
     const red=[...this.players.values()].filter(p=>p.team==='red').length,blue=this.players.size-red;
     const team:Team=red<=blue?'red':'blue';

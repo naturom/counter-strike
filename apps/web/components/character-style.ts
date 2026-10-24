@@ -1,7 +1,7 @@
 import type {AvatarId} from '@sirocco/shared';
 export type CharacterStyle={primary:string;secondary:string;trim:string;hands:string;metal:number;surface:'armor'|'weave'|'leather'|'skin'|'bark'};
 export const CHARACTER_STYLE:Record<AvatarId,CharacterStyle>={
- ironman:{primary:'#8e1818',secondary:'#b49050',trim:'#23282b',hands:'#991f1c',metal:.8,surface:'armor'},
+ ironman:{primary:'#a51e25',secondary:'#c6a15a',trim:'#23282b',hands:'#991f1c',metal:.8,surface:'armor'},
  spiderman:{primary:'#9d2534',secondary:'#193b61',trim:'#151c25',hands:'#ad2937',metal:.05,surface:'weave'},
  deadpool:{primary:'#7d242c',secondary:'#202329',trim:'#493e32',hands:'#822731',metal:.05,surface:'leather'},
  'captain-america':{primary:'#263d57',secondary:'#9dabb0',trim:'#82332e',hands:'#5d392e',metal:.3,surface:'leather'},

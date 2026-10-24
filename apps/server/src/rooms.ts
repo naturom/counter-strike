@@ -49,7 +49,7 @@ export class ArenaRoom extends Room {
     if(inviteSigner.verify(options.invite).id!==this.inviteId)throw new ServerError(403,'Wrong invitation');
     if(typeof options.nickname!=='string'||!options.nickname.trim()||options.nickname.length>20)throw new ServerError(400,'Nickname must be 1–20 characters');
     if(options.avatar!==undefined&&!validAvatar(options.avatar))throw new ServerError(400,'Unknown appearance');
-    return {avatar:options.avatar??'operator',name:options.nickname.trim().replace(/[\x00-\x1f\x7f]/g,'')||'Guest'};
+    return {avatar:options.avatar??'ironman',name:options.nickname.trim().replace(/[\x00-\x1f\x7f]/g,'')||'Guest'};
   }
   onJoin(client:Client,_options:unknown,auth:{name:string;avatar:AvatarId}) {
     this.profileExpiry?.clear();this.profileExpiry=undefined;this.autoDispose=true;

@@ -1,4 +1,5 @@
 import {SpawnMirrors} from './spawn-mirrors';
+import {equipAvatarModel} from './avatar-equipment';
 import {buildAvatar} from './avatar-models';
 import {SprayMarks} from './sprays';
 import * as THREE from 'three';
@@ -23,7 +24,7 @@ export class Arena {
   private scope=new SniperScope();private shownScope:ScopeLevel=0;private cycleUntil=0;
   private throwUntil=0;private equippedAt=0;
   private explosions:ExplosionEffects;private blastShake={start:0,duration:1,strength:0};
-  private mirrors:SpawnMirrors;private appearance:AvatarId='operator';private sprayMarks:SprayMarks;private spray=false;
+  private mirrors:SpawnMirrors;private appearance:AvatarId='ironman';private sprayMarks:SprayMarks;private spray=false;
   private tourIndex:number|null=null;
   private art:WorldArt;private audio=new GameAudio();private world?:RAPIER.World;private physicsReady=false;
   private mapId:MapId=DEFAULT_MAP;private roots=new Map<MapId,THREE.Group>();private mapRoot?:THREE.Group;
@@ -130,12 +131,12 @@ export class Arena {
   private debris(point:{x:number;y:number;z:number},normal:{x:number;y:number;z:number},count:number,blast=0){if(!this.world||this.particles.length>54)return;for(let j=0;j<count&&this.particles.length<64;j++){const angle=Math.random()*Math.PI*2,speed=blast?(2+Math.random()*8)*Math.sqrt(blast):0;const body=this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(point.x,point.y,point.z).setLinvel(blast?Math.cos(angle)*speed:normal.x*(1+j)+(Math.random()-.5)*2,blast?2+Math.random()*8:2+j*.3,blast?Math.sin(angle)*speed:normal.z*(1+j)+(Math.random()-.5)*2));this.world.createCollider(RAPIER.ColliderDesc.cuboid(.025,.025,.025).setRestitution(.2),body);const mesh=this.art.box(this.scene,.05,.05,.05,this.art.trim,point.x,point.y,point.z);this.particles.push({mesh,body,until:performance.now()+(blast?2200+blast*700:1100)});}}
   private avatar(p:Player){
     let g=this.avatars.get(p.id);
-    if(g&&g.userData.avatar!==(p.avatar??'operator')){disposeGroup(g);this.avatars.delete(p.id);g=undefined;}
+    if(g&&g.userData.avatar!==(p.avatar??'ironman')){disposeGroup(g);this.avatars.delete(p.id);g=undefined;}
     if(g){if(g.userData.weapon!==p.weapon){const old=g.getObjectByName('equippedWeapon');if(old)disposeGroup(old);this.equipAvatar(g,p.weapon,p.avatar);}return g;}
-    g=buildAvatar(this.art,p.avatar??'operator',p.team);
+    g=buildAvatar(this.art,p.avatar??'ironman',p.team);
     this.equipAvatar(g,p.weapon,p.avatar);g.traverse(o=>{if(o instanceof THREE.Mesh)o.castShadow=true;});this.avatars.set(p.id,g);this.scene.add(g);return g;
   }
-  private equipAvatar(group:THREE.Group,weapon:Equipment,avatar:AvatarId='operator'){for(const name of ['unarmedLeftArm','unarmedRightArm']){const arm=group.getObjectByName(name);if(arm)arm.visible=false;}const gun=this.art.weapon(weapon,false,true,avatar);gun.name='equippedWeapon';gun.scale.setScalar(.75);gun.position.set(.25,1.14,-.22);group.add(gun);group.userData.weapon=weapon;}
+  private equipAvatar(group:THREE.Group,weapon:Equipment,avatar:AvatarId='ironman'){equipAvatarModel(this.art,group,weapon,avatar);}
   private frame=(now:number)=>{
     if(this.destroyed)return;const dt=Math.min((now-this.last)/1000||0,.1);this.last=now;
     if(this.active&&this.snap){
