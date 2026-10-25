@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import type {AvatarId,Team} from '@sirocco/shared';
 import {characterSurface} from './character-surfaces';
+import {addWonderWoman} from './wonder-woman-model';
+import {addClassicUltraman} from './ultraman-model';
 import {ironArmor} from './iron-armor';
 import {ironHelmet,spiderLenses} from './character-armor';
 import {addRealAnatomy} from './character-anatomy';
@@ -12,7 +14,7 @@ function palette(art:WorldArt,id:AvatarId){let cache=palettes.get(art);if(!cache
  const style=CHARACTER_STYLE[id],armored=style.surface==='armor',surface=characterSurface(art,style);
  p=[...[style.primary,style.secondary,style.trim].map((color,i)=>art.material(color,{metalness:i===1?style.metal:armored?style.metal:.025,roughness:armored?(id==='ironman'?.8:.66):1,...surface})),art.material('#c19a7b',{roughness:.82}),art.material('#171d20',{roughness:.45}),art.material('#d9e4dd',{roughness:.28})];cache.set(id,p);return p;
 }
-export function buildAvatar(art:WorldArt,id:AvatarId,team:Team='red'){
+export function buildAvatar(art:WorldArt,id:AvatarId,_team:Team='red'){
  const root=new THREE.Group();root.name=id;root.userData.avatar=id;const [main,accent,dark,skin,black,white]=palette(art,id),bulky=id==='hulk'?1.26:id==='groot'?1.05:1,female=id==='wonder-woman'||id==='black-widow',flesh=id==='hulk'?main:skin;
  const ell=(parent:THREE.Object3D,x:number,y:number,z:number,sx:number,sy:number,sz:number,m:THREE.Material)=>{const o=new THREE.Mesh(new THREE.SphereGeometry(1,24,18),m);o.position.set(x,y,z);o.scale.set(sx,sy,sz);parent.add(o);return o;};
  const plate=(parent:THREE.Object3D,x:number,y:number,z:number,w:number,h:number,d:number,m:THREE.Material,r=.015)=>{const o=new THREE.Mesh(new RoundedBoxGeometry(w,h,d,2,Math.min(r,w/5,h/5,d/5)),m);o.position.set(x,y,z);parent.add(o);return o;};
@@ -23,11 +25,12 @@ export function buildAvatar(art:WorldArt,id:AvatarId,team:Team='red'){
  const shell=(parent:THREE.Object3D,outline:number[][],z:number,depth:number,m:THREE.Material)=>{const shape=new THREE.Shape();outline.forEach(([x,y],i)=>i?shape.lineTo(x,y):shape.moveTo(x,y));shape.closePath();const geo=new THREE.ExtrudeGeometry(shape,{depth,bevelEnabled:true,bevelSegments:3,steps:1,bevelSize:.008,bevelThickness:.007});const mesh=new THREE.Mesh(geo,m);mesh.position.z=z;parent.add(mesh);return mesh;};
  addRealAnatomy(root,art,id,palette(art,id));
  // Layered costume panels and seams give the body definition at gameplay range.
- if(!['hulk','groot','spiderman','ironman'].includes(id)){
+ if(!['hulk','groot','spiderman','ironman','ultraman','wonder-woman'].includes(id)){
   for(const side of [-1,1]){if(['ironman','batman','thor','captain-america'].includes(id))shell(root,[[side*.018,1.36],[side*.14,1.37],[side*.20,1.30],[side*.16,1.23],[side*.025,1.24]],-.17,.022,main);if(id==='ironman'||id==='batman')for(let i=0;i<3;i++)plate(root,side*.062,1.17-i*.057,-.159,.105,.045,.025,main,.01);}
   for(const side of [-1,1]){path([[side*.18,1.21,-.10],[side*.14,1.10,-.105],[side*.13,.98,-.09]],black,.004);}
   plate(root,0,.90,-.11,.34*bulky,.055,.055,dark);plate(root,0,.90,-.147,.065,.065,.025,accent);
  }
+ if(id==='ultraman')addClassicUltraman(root,art,main,accent);
  if(id==='ironman'){
   ironHelmet(root,art,main,accent,black);
   ironArmor(root,art,main,accent,black);
@@ -63,11 +66,7 @@ export function buildAvatar(art:WorldArt,id:AvatarId,team:Team='red'){
   cape(art.material('#792f36',{roughness:1,side:THREE.DoubleSide}));for(const side of [-1,1])for(const y of [1.34,1.19,1.05]){const disc=art.cylinder(root,.046,.046,.025,accent,side*.105,y,-.156);disc.rotation.x=Math.PI/2;}
   plate(root,.28,.82,.17,.13,.17,.13,accent);limb(root,[.28,.57,.17],[.28,.79,.17],.017,.017,dark);
  }
- if(id==='wonder-woman'){
-  plate(root,0,1.74,-.17,.19,.025,.018,accent);star(0,1.74,-.184,.020,main);
-  for(const side of [-1,1]){const v=plate(root,side*.065,1.33,-.19,.16,.035,.022,accent);v.rotation.z=side*.35;plate(root,side*.27,1.13,-.19,.09,.11,.06,accent);}
-  const lasso=new THREE.Mesh(new THREE.TorusGeometry(.085,.006,8,36),accent);lasso.position.set(.19,.87,.01);root.add(lasso);
- }
+ if(id==='wonder-woman')addWonderWoman(root,art,accent,main,dark);
  if(id==='black-widow'){
   plate(root,0,1.25,-.15,.015,.26,.01,accent);for(const side of [-1,1]){plate(root,side*.17,.83,-.055,.065,.16,.075,black);for(let i=0;i<5;i++)ell(root,side*.25,1.13,-.21+i*.02,.055,.012,.009,accent);}
   plate(root,0,.90,-.15,.045,.055,.016,art.material('#8f342d'));
@@ -77,14 +76,12 @@ export function buildAvatar(art:WorldArt,id:AvatarId,team:Team='red'){
   for(const side of [-1,1]){ell(root,side*.052,1.68,-.15,.020,.022,.017,black);for(let i=0;i<3;i++)limb(root,[side*(.03+i*.025),1.75,.01],[side*(.04+i*.030),1.81+(i%2)*.055,.015],.018,.008,main);}
   path([[-.04,1.57,-.115],[0,1.56,-.13],[.04,1.57,-.115]],black,.004);
  }
- if(!['hulk','groot'].includes(id))for(const side of [-1,1]){
+ if(!['hulk','groot','ultraman','wonder-woman'].includes(id))for(const side of [-1,1]){
   const leg=root.getObjectByName(side<0?'leftLeg':'rightLeg')!;
   const foot=root.userData.feet[leg.name],x=foot.x-leg.position.x,z=foot.z;
-  const bootMat=['ironman','spiderman'].includes(id)?main:id==='wonder-woman'?accent:black;plate(leg,x,-.845,z,.137,.11,.27,bootMat,.023);
+  const bootMat=['ironman','spiderman','ultraman'].includes(id)?main:id==='wonder-woman'?accent:black;plate(leg,x,-.845,z,.137,.11,.27,bootMat,.023);
   plate(leg,x,-.885,z,.137,.025,.265,black,.012);
   limb(leg,[x,-.85,z+.04],[x,-.66,z+.07],.067,.060,bootMat);for(let i=0;i<5;i++)plate(leg,x,-.78-i*.016,z-.055,.085,.006,.009,black,.001);
  }
- // Team markers remain independent of costume color.
- const marker=art.material(team==='red'?'#e99067':'#6dc8df',{emissive:team==='red'?'#542519':'#153f50',emissiveIntensity:.35});for(const side of [-1,1])plate(root,side*.27*bulky,1.35,-.077,.07,.025,.018,marker,.004);
  root.traverse(o=>{if(o instanceof THREE.Mesh)o.castShadow=o.receiveShadow=true;});return root;
 }

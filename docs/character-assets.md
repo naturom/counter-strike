@@ -14,6 +14,21 @@ folder: `base_body.glb`, `base_body.joints.json`, `hair_long01.glb`,
 Run `node scripts/build-character-assets.mjs <source-folder>` to regenerate them.
 No Blender installation or runtime connection to the upstream repository is needed.
 
+Iron Man, Ultraman and Wonder Woman's equipped arms use the same anatomical surface and
+original skin weights, including their deltoids, elbow contours and forearm taper.
+`node scripts/build-character-assets.mjs <source-folder> --arms-only` regenerates
+`character-arm-data.json` without changing the other character assets. The runtime
+pins the original torso boundary, poses the upper arm, forearm and wrist, and
+keeps glove contacts attached during equipment actions. Iron Man retains segmented
+metal colours. Torso and thigh panels are thin closed shells clipped from the
+anatomical surface, with an inset reactor and small machined seams. Leg panels
+share the thigh transform so they remain fitted while moving. Wonder Woman uses the textured skin and fitted wrist bracers.
+
+`avatar-motion.ts` updates the actual world body before the reflection camera
+renders. Local gait and crouching follow predicted movement; equipment sway, aim
+and reload poses rebase the shoulder anchors each frame so the torso seams stay
+attached. Mirrors and other players render that same posed model.
+
 Geometry is synchronous and shared through the browser bundle; textures load from
 this game's origin. Male/female anatomy and open/closed hands retain the existing
 player size, weapon transforms and movement controls. Meshes stay on the same team

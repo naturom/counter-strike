@@ -1,4 +1,5 @@
 import {SpawnMirrors} from './spawn-mirrors';
+import {animateAvatarMotion} from './avatar-motion';
 import {equipAvatarModel} from './avatar-equipment';
 import {buildAvatar} from './avatar-models';
 import {SprayMarks} from './sprays';
@@ -187,7 +188,18 @@ export class Arena {
         const light=mesh.getObjectByName('bombLight');if(light)light.visible=bomb.status==='planted'&&now-(this.lastBombBeeps.get(bomb.team)??0)<100;
       }
       const renderTime=now-100;let a=this.snapshots[0],b=this.snapshots.at(-1)!;for(let j=1;j<this.snapshots.length;j++)if(this.snapshots[j].received>=renderTime){a=this.snapshots[j-1];b=this.snapshots[j];break;}const t=a&&b?THREE.MathUtils.clamp((renderTime-a.received)/Math.max(1,b.received-a.received),0,1):1;
-      for(const p of this.snap.players){const own=p.id===this.id,avatar=this.avatar(p);if(own)avatar.traverse(o=>o.layers.set(1));avatar.visible=p.hp>0;const previous=a?.state.players.find(q=>q.id===p.id)??p,next=b?.state.players.find(q=>q.id===p.id)??p;avatar.position.set(THREE.MathUtils.lerp(previous.x,next.x,t),THREE.MathUtils.lerp(previous.y,next.y,t),THREE.MathUtils.lerp(previous.z,next.z,t));if(own){avatar.position.set(this.predicted.x,this.predicted.y,this.predicted.z);const equipped=avatar.getObjectByName('equippedWeapon') as THREE.Group;animateHands(equipped,this.weapon,{reload:reloadProgress,throwProgress,plant:plantProgress,slash:slashProgress,reverseSlash:this.reverseSlash,reduceMotion:this.reduceMotion});}avatar.rotation.y=own?this.yaw:next.yaw;avatar.scale.y=THREE.MathUtils.lerp(avatar.scale.y,p.crouched?.61:1,Math.min(1,dt*12));const walking=Math.hypot(next.x-previous.x,next.z-previous.z)>.025;for(const [i,name] of ['leftLeg','rightLeg'].entries()){const leg=avatar.getObjectByName(name);if(leg)leg.rotation.x=walking?Math.sin(now*.014+i*Math.PI)*.32:0;}}
+      for(const p of this.snap.players){
+       const own=p.id===this.id,avatar=this.avatar(p);if(own)avatar.traverse(o=>o.layers.set(1));avatar.visible=p.hp>0;
+       const previous=a?.state.players.find(q=>q.id===p.id)??p,next=b?.state.players.find(q=>q.id===p.id)??p;
+       avatar.position.set(THREE.MathUtils.lerp(previous.x,next.x,t),THREE.MathUtils.lerp(previous.y,next.y,t),THREE.MathUtils.lerp(previous.z,next.z,t));
+       if(own)avatar.position.set(this.predicted.x,this.predicted.y,this.predicted.z);
+       avatar.rotation.y=own?this.yaw:next.yaw;
+       avatar.scale.y=THREE.MathUtils.lerp(avatar.scale.y,(own?this.predicted.crouched:p.crouched)?.61:1,Math.min(1,dt*12));
+       const remoteReload=isGun(p.weapon)&&p.reloadUntil>this.snap.time?THREE.MathUtils.clamp(1-(p.reloadUntil-this.snap.time)/WEAPONS[p.weapon].reload,0,1):0;
+       const action=this.snap.bombs.find(bomb=>bomb.action?.kind==='plant'&&bomb.action.playerId===p.id)?.action;
+       const remotePlant=action?THREE.MathUtils.clamp((this.snap.time-action.startedAt)/(action.completeAt-action.startedAt),0,1):0;
+       animateAvatarMotion(avatar,own?this.weapon:p.weapon,own?{reload:reloadProgress,throwProgress,plant:plantProgress,slash:slashProgress,reverseSlash:this.reverseSlash,reduceMotion:this.reduceMotion}:{reload:remoteReload,plant:remotePlant,throwProgress:0,slash:1},dt,own?this.predicted.grounded:p.grounded,own?this.pitch:next.pitch);
+      }
       for(const [id,g] of this.avatars)if(!this.snap.players.some(p=>p.id===id)){disposeGroup(g);this.avatars.delete(id);this.remoteStep.delete(id);this.remoteLanding.delete(id);}
       for(const g of this.snap.grenades){let mesh=this.grenadeMeshes.get(g.id);if(!mesh){mesh=this.art.weapon('grenade',false);mesh.scale.setScalar(1.4);this.grenadeMeshes.set(g.id,mesh);this.scene.add(mesh);}mesh.position.lerp(new THREE.Vector3(g.x,g.y,g.z),Math.min(1,dt*25));mesh.rotation.z=now*.004;}
       for(const [id,g] of this.grenadeMeshes)if(!this.snap.grenades.some(p=>p.id===id)){disposeGroup(g);this.grenadeMeshes.delete(id);}
