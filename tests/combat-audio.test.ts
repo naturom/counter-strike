@@ -10,6 +10,17 @@ test('combat sounds have finite bounded samples, clean endpoints, distinct weapo
  for(const kind of kinds){const a=combatSignal(12000,kind),b=combatSignal(12000,kind,1);assert.equal(a.length,Math.ceil(soundDuration(kind)*12000));assert.ok(a.every(x=>Number.isFinite(x)&&Math.abs(x)<=.821));assert.equal(Math.abs(a[0]),0);assert.equal(Math.abs(a.at(-1)!),0);assert.ok(a.some(x=>Math.abs(x)>.05));assert.notDeepEqual(a,b);}
  assert.notDeepEqual(combatSignal(12000,'rifle'),combatSignal(12000,'pistol'));
 });
+test('AWP reports have a strong low-bass body and a sustained tail without clipping or abrupt edges',()=>{
+ for(const rate of [22050,48000])for(let variant=0;variant<4;variant++){
+  const shot=combatSignal(rate,'marksman',variant),rifle=combatSignal(rate,'rifle',variant),alpha=1-Math.exp(-2*Math.PI*100/rate);let low=0,bass=0,total=0,tail=0;
+  for(let i=0;i<shot.length;i++){const sample=shot[i];low+=alpha*(sample-low);bass+=low*low;total+=sample*sample;if(i>rate*.1&&i<rate*.4)tail+=sample*sample;}
+  const rifleEnergy=rifle.reduce((sum,sample)=>sum+sample*sample,0);
+  assert.ok(bass/total>.30,'the low-end pressure body should be clearly audible below 100 Hz');
+  assert.ok(total/shot.length>rifleEnergy/rifle.length*1.5,'the AWP should carry more weight than the rifle');
+  assert.ok(tail/(rate*.3)>.004,'the boom should continue after the initial crack');
+  assert.ok(shot.every(sample=>Number.isFinite(sample)&&Math.abs(sample)<=.821));assert.equal(shot[0],0);assert.equal(shot.at(-1),0);
+ }
+});
 function wav(url:string){
  const bytes=readFileSync(`apps/web/public${url}`);assert.equal(bytes.toString('ascii',0,4),'RIFF');assert.equal(bytes.toString('ascii',8,12),'WAVE');
  let rate=0,channels=0,data:Buffer|undefined;for(let i=12;i+8<=bytes.length;){const tag=bytes.toString('ascii',i,i+4),size=bytes.readUInt32LE(i+4);if(tag==='fmt '){assert.equal(bytes.readUInt16LE(i+8),1);channels=bytes.readUInt16LE(i+10);rate=bytes.readUInt32LE(i+12);assert.equal(bytes.readUInt16LE(i+22),16);}if(tag==='data')data=bytes.subarray(i+8,i+8+size);i+=8+size+(size%2);}

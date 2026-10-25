@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {Client, type Room} from '@colyseus/sdk';
 import {createGameServer} from '../apps/server/src/http';
 import {activeRooms} from '../apps/server/src/rooms';
-import {neutralInput,dustPoint,type CombatEvent,type Snapshot} from '@sirocco/shared';
+import {neutralInput,RESPAWN_MS,dustPoint,type CombatEvent,type Snapshot} from '@sirocco/shared';
 const delay=(ms:number)=>new Promise(r=>setTimeout(r,ms));
 async function until(fn:()=>boolean,timeout=4000){const start=Date.now();while(!fn()){if(Date.now()-start>timeout)throw new Error('Timed out waiting for network state');await delay(25);}}
 test('real WebSocket clients: rooms, combat, reconnect, capacity, 8-player load and fresh invite room',{timeout:30000},async()=>{
@@ -27,9 +27,11 @@ test('real WebSocket clients: rooms, combat, reconnect, capacity, 8-player load 
     // Deterministic fixture positions injected only inside this in-process test. No network test hooks exist.
     Object.assign(pa,{...dustPoint(380,930,3.2),yaw:0,protectedUntil:0});Object.assign(pb,{...dustPoint(380,900,3.2),protectedUntil:0});
     const combat:CombatEvent[]=[];a.onMessage('combat',(e:CombatEvent)=>combat.push(e));
-    let seq=0;const firing=setInterval(()=>a.send('input',{...neutralInput(),seq:++seq,fire:true}),1000/30);
-    await until(()=>state?.players.find(p=>p.id===b.sessionId)?.hp===0);clearInterval(firing);assert.equal(state!.scores.red,1);await until(()=>combat.some(e=>e.type==='kill'));assert.equal(combat.find(e=>e.type==='kill')?.hitZone,'head');assert.equal(combat.filter(e=>e.type==='damage').length,1);assert.equal(combat.find(e=>e.type==='damage')?.damage,100);
-    await until(()=>state?.players.find(p=>p.id===b.sessionId)?.hp===100,4500);
+    let seq=0;await delay(150);a.send('input',{...neutralInput(),seq:++seq,fire:true,pitch:-1.2});
+    await until(()=>!!state?.impacts.length);assert.ok(combat.some(e=>e.type==='shot'&&e.impact));assert.equal(state!.impacts[0].weapon,'rifle');
+    const firing=setInterval(()=>a.send('input',{...neutralInput(),seq:++seq,fire:true}),1000/30);
+    await until(()=>state?.players.find(p=>p.id===b.sessionId)?.hp===0);clearInterval(firing);const dead=state!.players.find(p=>p.id===b.sessionId)!;assert.ok(dead.death);assert.equal(dead.respawnAt-dead.death.at,RESPAWN_MS);assert.equal(state!.scores.red,1);await until(()=>combat.some(e=>e.type==='kill'));assert.equal(combat.find(e=>e.type==='kill')?.hitZone,'head');assert.equal(combat.filter(e=>e.type==='damage').length,1);assert.equal(combat.find(e=>e.type==='damage')?.damage,100);
+    await until(()=>state?.players.find(p=>p.id===b.sessionId)?.hp===100,RESPAWN_MS+1500);
     const reconnectToken=b.reconnectionToken,session=b.sessionId;
     (b.connection as any).close();await until(()=>sim.players.get(session)?.connected===false);
     const restored=await new Client(ws).reconnect(reconnectToken);restored.reconnection.enabled=false;clients.push(restored);restored.onMessage('snapshot',()=>{});restored.onMessage('combat',()=>{});restored.onMessage('votes',()=>{});assert.equal(restored.sessionId,session);assert.equal(sim.players.get(session)?.deaths,1);

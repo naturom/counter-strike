@@ -34,7 +34,7 @@ export class GameAudio {
     source.start(c.currentTime+mix.delay+delay);return source;
   }
   spray(at?:Vec3,occluded=false){this.play('spray',at,18,.78,occluded);}
-  shot(weapon:Weapon,at?:Vec3,occluded=false){this.play(weapon,at,140,.95,occluded);}
+  shot(weapon:Weapon,at?:Vec3,occluded=false){this.play(weapon,at,140,weapon==='marksman'?1.3:.95,occluded);}
   reload(weapon:Weapon,owner:string,at?:Vec3,occluded=false){this.play(`reload-${weapon}`,at,20,.65,occluded,owner);}
   cancelReload(owner:string){const source=this.reloads.get(owner);if(source){source.stop();this.reloads.delete(owner);}}
   syncReloads(active:Set<string>){for(const owner of this.reloads.keys())if(!active.has(owner))this.cancelReload(owner);}

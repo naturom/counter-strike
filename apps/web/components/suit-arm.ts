@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {createAnatomicalArm,bindAnatomicalArm,anatomicalShoulder,poseAnatomicalArm} from './anatomical-arm';
 type Style='ultraman'|'wonder-woman'|'ironman';
 /** The character's original skinned anatomy, rather than a swept circular tube. */
-export function createSuitArm(skin:THREE.Material,accent:THREE.Material,style:Style='ultraman',left=false,joint:THREE.Material=skin){return createAnatomicalArm(skin,accent,style,left,joint);}
+export function createSuitArm(skin:THREE.Material,accent:THREE.Material,style:Style='ultraman',left=false,joint:THREE.Material=skin,firstPerson=false){return createAnatomicalArm(skin,accent,style,left,joint,firstPerson);}
 export function bindIronManShoulders(model:THREE.Group,held:THREE.Group){bindFittedShoulders(model,held,'shoulder-shell');}
 export function bindUltramanShoulders(model:THREE.Group,held:THREE.Group){bindFittedShoulders(model,held,'ultraman-shoulder-bridge');}
 export function bindWonderWomanShoulders(model:THREE.Group,held:THREE.Group){bindFittedShoulders(model,held,'wonder-woman-shoulder');}

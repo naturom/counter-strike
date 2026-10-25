@@ -176,7 +176,7 @@ test('moving reflected bodies keep anatomical shoulder seams fixed while hands a
     animateAvatarMotion(model,kind,{reload:i/13,plant:i/13,throwProgress:i/13,slash:i/13},1/60,true,.3*Math.sin(i));
     for(const name of ['leftArm','rightArm']){
      const arm=held.getObjectByName(name)!,rig=arm.userData.ironArm,skin=rig.skin as THREE.Mesh,shape=skin.userData.anatomicalArm,p=skin.geometry.attributes.position;
-     for(const j of shape.shoulderEdge){const actual=skin.localToWorld(new THREE.Vector3().fromBufferAttribute(p,j)),expected=model.localToWorld(new THREE.Vector3().fromArray(shape.position,j*3));assert.ok(actual.distanceTo(expected)<1e-5,`${avatar} ${kind}: moving mirror shoulder detached`);}
+     for(const j of shape.shoulderEdge){const torso=model.getObjectByName('avatarTorso')??model,actual=skin.localToWorld(new THREE.Vector3().fromBufferAttribute(p,j)),expected=torso.localToWorld(new THREE.Vector3().fromArray(shape.position,j*3));assert.ok(actual.distanceTo(expected)<1e-5,`${avatar} ${kind}: moving mirror shoulder detached`);}
      assert.ok(skin.layers.isEnabled(1),'mirror must render the same posed arm');assert.ok(Array.from(p.array).every(Number.isFinite));
     }
    }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {Client,type Room} from '@colyseus/sdk';
-import {intersects,MAPS,neutralInput,type Snapshot,type Player} from '@sirocco/shared';
+import {intersects,MAPS,RESPAWN_MS,neutralInput,type Snapshot,type Player} from '@sirocco/shared';
 const base=(process.env.BASE_URL??'http://127.0.0.1:3000').replace(/\/$/,'');
 const mapId=process.env.MAP_ID==='relay'?'relay':'dunes';const SOLIDS=MAPS[mapId].solids;
 const wait=(ms:number)=>new Promise(r=>setTimeout(r,ms));
@@ -42,7 +42,7 @@ async function main(){
     await Promise.all([drive(a,{x:0,z:-4}),drive(b,{x:0,z:-8})]);
     const own=()=>a.state!.players.find(p=>p.id===a.room.sessionId)!,enemy=()=>a.state!.players.find(p=>p.id===b.room.sessionId)!;
     const fireStart=Date.now();while(enemy().hp>0){assert.ok(Date.now()-fireStart<5000,'live hitscan kill');const p=own(),q=enemy();a.room.send('input',{...neutralInput(),seq:++a.seq,yaw:Math.atan2(-(q.x-p.x),-(q.z-p.z)),fire:true});await wait(34);}
-    a.room.send('input',{...neutralInput(),seq:++a.seq,weapon:own().weapon});assert.equal(a.state!.scores.red,1);assert.equal(own().kills,1);assert.equal(enemy().deaths,1);await until(()=>enemy().hp===100,5000);
+    a.room.send('input',{...neutralInput(),seq:++a.seq,weapon:own().weapon});assert.equal(a.state!.scores.red,1);assert.equal(own().kills,1);assert.equal(enemy().deaths,1);await until(()=>enemy().hp===100,RESPAWN_MS+1500);
     await drive(b,{x:0,z:-8});let exploded=false;a.room.onMessage('combat',(e:any)=>{if(e.type==='explosion'&&e.shooter===a.room.sessionId)exploded=true;});
     a.room.send('input',{...neutralInput(),seq:++a.seq,yaw:0,pitch:-1.2,weapon:'grenade',fire:true});await until(()=>own().grenades===1);await until(()=>exploded,5000);await until(()=>enemy().hp<100,2000);
     const oldId=b.room.sessionId,token=b.room.reconnectionToken;b.room.connection.close();await wait(300);const rejoined=await new Client(base.replace(/^http/,'ws')).reconnect(token);rejoined.reconnection.enabled=false;rejoined.onMessage('combat',()=>{});rejoined.onMessage('votes',()=>{});rejoined.onMessage('snapshot',(s:Snapshot)=>b.state=s);b.room=rejoined;assert.equal(rejoined.sessionId,oldId);

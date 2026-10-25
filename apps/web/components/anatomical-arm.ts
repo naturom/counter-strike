@@ -15,7 +15,7 @@ function boneFrame(a:THREE.Vector3,b:THREE.Vector3,pole:THREE.Vector3,width=1,le
 function clip(poly:number[][],distance:(v:number[])=>number,sign=1){
  const result:number[][]=[];for(let i=0;i<poly.length;i++){const a=poly[i],b=poly[(i+1)%poly.length],da=distance(a)*sign,db=distance(b)*sign;if(da<=1e-9)result.push(a);if((da<0&&db>0)||(da>0&&db<0)){const t=da/(da-db);result.push(a.map((v,k)=>v+(b[k]-v)*t));}}return result;
 }
-export function createAnatomicalArm(skin:THREE.Material,accent:THREE.Material,style:Style,left:boolean,joint:THREE.Material=skin){
+export function createAnatomicalArm(skin:THREE.Material,accent:THREE.Material,style:Style,left:boolean,joint:THREE.Material=skin,firstPerson=false){
  const data=source[style==='wonder-woman'?'female':'male'][left?'l':'r'] as ArmData,p=new Int16Array(bytes(data.position).buffer),n=new Int8Array(bytes(data.normal).buffer),uv=new Uint16Array(bytes(data.uv).buffer),weights=bytes(data.weights),indices=new Uint16Array(bytes(data.index).buffer),[shoulder,elbow,wrist]=data.joints.map(vector),foreAxis=wrist.clone().sub(elbow).normalize(),pole=elbow.clone().sub(shoulder).cross(foreAxis).normalize(),cut=style==='wonder-woman'?1.335:1.30,positions:number[]=[],normals:number[]=[],uvs:number[]=[],influences:number[]=[],groups:number[]=[];
  const vertex=(i:number)=>[p[i*3]/10000,p[i*3+1]/10000,p[i*3+2]/10000,n[i*3]/127,n[i*3+1]/127,n[i*3+2]/127,uv[i*2]/65535,uv[i*2+1]/65535,...Array.from(weights.subarray(i*4,i*4+4),w=>w/255)];
  // Locate the original open edge where the arm joins the torso. UV splits must
@@ -33,7 +33,7 @@ export function createAnatomicalArm(skin:THREE.Material,accent:THREE.Material,st
    const jointStart=(v:number[])=>along(v)+.014,jointEnd=(v:number[])=>along(v)-.014,bicep=(v:number[])=>v[1]-1.34;
    const top=clip(poly,jointStart);emit(clip(top,bicep),1);emit(clip(top,bicep,-1),0);emit(clip(clip(poly,jointStart,-1),jointEnd),2);emit(clip(poly,jointEnd,-1),0);
   }else if(style==='ultraman'){const lower=(v:number[])=>v[1]-elbow.y-.035,upper=(v:number[])=>v[1]-cut;emit(clip(poly,lower),0);emit(clip(clip(poly,lower,-1),upper),1);emit(clip(poly,upper,-1),0);}
-  else{const first=(v:number[])=>along(v)-foreLength*.50,last=(v:number[])=>along(v)-foreLength-.013;emit(clip(poly,first),0);emit(clip(clip(poly,first,-1),last),1);emit(clip(poly,last,-1),0);}
+  else{const first=(v:number[])=>along(v)-foreLength*.50,last=(v:number[])=>along(v)-foreLength+.012;emit(clip(poly,first),0);emit(clip(clip(poly,first,-1),last),1);emit(clip(poly,last,-1),0);}
  }
  const geometry=new THREE.BufferGeometry(),order=groups.map((material,i)=>({material,i})).sort((a,b)=>a.material-b.material),sorted=(values:number[],size:number)=>order.flatMap(({i})=>values.slice(i*3*size,(i+1)*3*size));
  geometry.setAttribute('position',new THREE.Float32BufferAttribute(sorted(positions,3),3));geometry.setAttribute('normal',new THREE.Float32BufferAttribute(sorted(normals,3),3));geometry.setAttribute('uv',new THREE.Float32BufferAttribute(sorted(uvs,2),2));geometry.setAttribute('armWeights',new THREE.Float32BufferAttribute(sorted(influences,4),4));
@@ -44,10 +44,22 @@ export function createAnatomicalArm(skin:THREE.Material,accent:THREE.Material,st
  // Armour follows the anatomical silhouette, with a small shell thickness that
  // fades out at the pinned torso seam and the glove cuff.
  if(style==='ironman')for(let i=0;i<rest.count;i++){const at=new THREE.Vector3().fromBufferAttribute(rest,i),normal=new THREE.Vector3().fromBufferAttribute(welded.attributes.normal,i).normalize(),shell=.006*(1-pin[i])*(1-cuff[i]);at.addScaledVector(normal,shell);rest.setXYZ(i,at.x,at.y,at.z);}
+ // Camera-facing arms need more volume than distant player meshes. Expand
+ // around the anatomical bone axes, gradually tapering the last half of the
+ // forearm into the original wrist instead of producing an abrupt cuff bulge.
+ if(firstPerson){
+  const upperAxis=elbow.clone().sub(shoulder).normalize(),upperLength=shoulder.distanceTo(elbow),upperWidth=style==='ironman'?1.30:1.23,foreWidth=style==='ironman'?1.44:style==='ultraman'?1.36:1.32;
+  for(let i=0;i<rest.count;i++){
+   const at=new THREE.Vector3().fromBufferAttribute(rest,i),distance=at.clone().sub(elbow).dot(foreAxis),center=distance>0?elbow.clone().addScaledVector(foreAxis,distance):shoulder.clone().addScaledVector(upperAxis,THREE.MathUtils.clamp(at.clone().sub(shoulder).dot(upperAxis),0,upperLength));
+   const width=THREE.MathUtils.lerp(upperWidth,foreWidth,THREE.MathUtils.smoothstep(distance,-.055,.035)),taper=1-THREE.MathUtils.smoothstep(distance/foreLength,.40,.98);
+   at.sub(center).multiplyScalar(1+(width-1)*taper).add(center);rest.setXYZ(i,at.x,at.y,at.z);
+  }
+  welded.computeVertexNormals();
+ }
  if(style==='wonder-woman')welded.setAttribute('color',new THREE.Float32BufferAttribute(new Float32Array(rest.count*3).fill(1),3));
  const mesh=new THREE.Mesh(welded,style==='ironman'?[skin,accent,joint]:[skin,accent]);mesh.name='anatomical-posed-arm';mesh.castShadow=mesh.receiveShadow=true;mesh.frustumCulled=false;
  const shape:ArmShape={position:Float32Array.from(rest.array),normal:Float32Array.from(welded.attributes.normal.array),weights:Float32Array.from(welded.attributes.armWeights.array),pin,cuff,wristAngles,cuffIndices,shoulder,elbow,wrist,upperInverse:boneFrame(shoulder,elbow,pole).invert(),lowerInverse:boneFrame(elbow,wrist,pole).invert(),handInverse,cut,foreAxis,shoulderEdge:edge,wristEdge};
- Object.assign(mesh.userData,{anatomicalArm:shape,style,left,radiusScale:style==='wonder-woman'?.84:1,upperLength:shoulder.distanceTo(elbow)/.75,forearmLength:foreLength/.75});return mesh;
+ Object.assign(mesh.userData,{anatomicalArm:shape,style,left,firstPerson,radiusScale:style==='wonder-woman'?.84:1,upperLength:shoulder.distanceTo(elbow)/.75,forearmLength:foreLength/.75});return mesh;
 }
 export function bindAnatomicalArm(mesh:THREE.Mesh,sourceToHeld:THREE.Matrix4){
  const shape=mesh.userData.anatomicalArm as ArmShape;shape.sourceToHeld=sourceToHeld;
@@ -83,10 +95,17 @@ export function poseAnatomicalArm(mesh:THREE.Mesh,shoulder:THREE.Vector3,elbow:T
  }
  // The glove and suit share the same wrist ellipse; the blend is limited to the cuff.
  if(mesh.userData.gloveWrist){
-  const frameNormal=new THREE.Matrix3().getNormalMatrix(palm),[width,depth]=mesh.userData.wristRadii??[.034,.027];
+  const frameNormal=new THREE.Matrix3().getNormalMatrix(palm),[width,depth]=mesh.userData.wristRadii??[.034,.027],handFrame=palm.clone().invert();
   for(const i of shape.cuffIndices){
    const weight=shape.cuff[i];
-   const p=new THREE.Vector3().fromBufferAttribute(out,i),angle=shape.wristAngles[i],target=new THREE.Vector3(Math.cos(angle)*width,Math.sin(angle)*depth,.12).applyMatrix4(palm),n=new THREE.Vector3(Math.cos(angle)/width,Math.sin(angle)/depth,0).applyMatrix3(frameNormal).normalize();p.lerp(target,weight);n.lerp(new THREE.Vector3().fromBufferAttribute(normal,i),1-weight).normalize();out.setXYZ(i,p.x,p.y,p.z);normal.setXYZ(i,n.x,n.y,n.z);
+   const p=new THREE.Vector3().fromBufferAttribute(out,i),angle=shape.wristAngles[i],target=new THREE.Vector3(Math.cos(angle)*width,Math.sin(angle)*depth,.12).applyMatrix4(palm),n=new THREE.Vector3(Math.cos(angle)/width,Math.sin(angle)/depth,0).applyMatrix3(frameNormal).normalize();p.lerp(target,weight);
+   if(mesh.userData.style==='wonder-woman'){
+    // Keep successive bracer rings behind the hand's wrist plane. Blending
+    // directly toward a tilted hand could curl the middle rings past the open
+    // end, producing a hollow lip despite a correctly aligned edge contour.
+    p.applyMatrix4(handFrame);p.z=.12+.035*(1-weight);p.applyMatrix4(palm);
+   }
+   n.lerp(new THREE.Vector3().fromBufferAttribute(normal,i),1-weight).normalize();out.setXYZ(i,p.x,p.y,p.z);normal.setXYZ(i,n.x,n.y,n.z);
   }
  }
  out.needsUpdate=true;normal.needsUpdate=true;mesh.geometry.computeBoundingBox();mesh.geometry.computeBoundingSphere();

@@ -29,6 +29,25 @@ renders. Local gait and crouching follow predicted movement; equipment sway, aim
 and reload poses rebase the shoulder anchors each frame so the torso seams stay
 attached. Mirrors and other players render that same posed model.
 
+Jump/crouch animation keeps a full-size torso, head and hands together above
+articulated thighs, knees and ankles. The pelvis lowers for crouching while the
+feet remain planted; airborne poses tuck the legs and landing bends the knees.
+Arm/hip seams follow the torso and Wonder Woman's skirt follows the thighs.
+`StanceMotion` also drives restrained first-person hand movement, respecting
+reduced-motion preferences. Movement collision, camera eye heights and damage
+rules continue to use the shared gameplay model.
+
+First-person arms use a separate radial fit around those same anatomical bone
+axes, with fuller forearms and a gradual taper into the unchanged glove cuffs.
+This camera-specific fit does not change the full-body or mirror proportions.
+All weapon views share machined receivers, textured grips, detailed controls and
+optics: the first-person gun, mirrored/remote player gun and pickups build the
+same complete design and reuse the same finish and lens materials, including a
+visible full-length shoulder stock. First-person framing keeps the barrel aimed
+along the crosshair, and muzzle sockets attach flashes/tracers to the actual gun. Static detail
+is batched by material, while magazines, pistol slides and sniper bolts remain
+separate for their reload/firing animations.
+
 Geometry is synchronous and shared through the browser bundle; textures load from
 this game's origin. Male/female anatomy and open/closed hands retain the existing
 player size, weapon transforms and movement controls. Meshes stay on the same team

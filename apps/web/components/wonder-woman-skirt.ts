@@ -38,14 +38,22 @@ export function wonderWomanSkirtGeometry(){
 export function poseWonderWomanSkirt(model:THREE.Group){
  if(model.userData.avatar!=='wonder-woman')return;
  const left=model.getObjectByName('leftLeg')?.rotation.x??0,right=model.getObjectByName('rightLeg')?.rotation.x??0;
+ const torso=model.getObjectByName('avatarTorso'),legs=['leftLeg','rightLeg'].map(name=>model.getObjectByName(name)),transforms:THREE.Matrix4[]=[];
+ if(torso&&legs.every(Boolean)){
+  model.updateWorldMatrix(true,true);const inverse=torso.matrixWorld.clone().invert();
+  for(const leg of legs)transforms.push(inverse.clone().multiply(leg!.matrixWorld).multiply(new THREE.Matrix4().makeTranslation(leg!.name==='leftLeg'?.10:-.10,-.91,0)));
+ }
+ const signature=transforms.length?transforms.flatMap(m=>m.elements).map(n=>n.toFixed(6)).join(','):'';
  const parts:THREE.Mesh[]=model.userData.skirtParts??=model.getObjectsByProperty('name','wonder-woman-fitted-skirt').concat(model.getObjectsByProperty('name','wonder-woman-skirt-seam'));
  for(const mesh of parts){
-  if(mesh.userData.skirtLeft===left&&mesh.userData.skirtRight===right)continue;
+  if(mesh.userData.skirtLeft===left&&mesh.userData.skirtRight===right&&mesh.userData.skirtPose===signature)continue;
   mesh.userData.skirtLeft=left;mesh.userData.skirtRight=right;
+  mesh.userData.skirtPose=signature;
   const p=mesh.geometry.attributes.position,rest:Float32Array=mesh.userData.skirtRest??=Float32Array.from(p.array);
   for(let i=0;i<p.count;i++){
-   const x=rest[i*3],y=rest[i*3+1],z=rest[i*3+2],angle=THREE.MathUtils.lerp(left,right,THREE.MathUtils.smoothstep(x,-.06,.06))*THREE.MathUtils.smoothstep(1.035-y,0,.17),sin=Math.sin(angle),cos=Math.cos(angle),drop=y-.91;
-   p.setXYZ(i,x,.91+drop*cos-z*sin,drop*sin+z*cos);
+   const x=rest[i*3],y=rest[i*3+1],z=rest[i*3+2],fall=THREE.MathUtils.smoothstep(1.035-y,0,.17);
+   if(transforms.length){const at=new THREE.Vector3(x,y,z),target=at.clone().applyMatrix4(transforms[0]).lerp(at.clone().applyMatrix4(transforms[1]),THREE.MathUtils.smoothstep(x,-.06,.06));at.lerp(target,fall);p.setXYZ(i,at.x,at.y,at.z);}
+   else{const angle=THREE.MathUtils.lerp(left,right,THREE.MathUtils.smoothstep(x,-.06,.06))*fall,sin=Math.sin(angle),cos=Math.cos(angle),drop=y-.91;p.setXYZ(i,x,.91+drop*cos-z*sin,drop*sin+z*cos);}
   }
   p.needsUpdate=true;mesh.geometry.computeVertexNormals();mesh.geometry.computeBoundingSphere();
  }

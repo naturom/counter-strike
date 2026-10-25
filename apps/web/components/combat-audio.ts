@@ -16,10 +16,13 @@ export function combatSignal(rate:number,kind:SynthSoundKind,variant=0){
   let low=0,phase=random()*Math.PI;const alpha=1-Math.exp(-2*Math.PI*cutoff/rate),offset=Math.floor(start*rate);
   for(let j=0;j<length*rate&&offset+j<out.length;j++){const t=j/rate,n=random();low+=alpha*(n-low);phase+=2*Math.PI*resonance/rate;const envelope=(1-Math.exp(-t/attack))*Math.exp(-t/decay)*Math.min(1,(length-t)/.012);out[offset+j]+=(low*(1-toneMix)+Math.sin(phase)*toneMix)*level*envelope;}
  };
-  const profile={rifle:[.009,.085,115,.9],pistol:[.007,.055,180,.7],smg:[.005,.045,210,.6],marksman:[.014,.14,78,1.15]}[kind as Weapon];
+  const profile={rifle:[.009,.085,115,.9],pistol:[.007,.055,180,.7],smg:[.005,.045,210,.6],marksman:[.018,.19,58,1.55]}[kind as Weapon];
   layer(0,.065,2,14500,profile[0]); // muzzle crack
   layer(.002,.28,1.5,2200,profile[1]); // gas / pressure
   layer(.004,.33,profile[3],350,profile[1],profile[2],.22); // chest of the report
+  // The AWP has a deep pressure thump beneath the crack, with a short,
+  // textured 52 Hz body rather than pitching down the whole gun report.
+  if(kind==='marksman')layer(.005,.58,1.65,135,.20,52,.4,.002);
   layer(.022,.075,.2,6500,.017);layer(.065,.09,.12,3600,.022); // action and case
   const dry=out.slice();
   for(const [delay,gain] of [[.067,.2],[.133,.13],[.239,.07],[.37,.035]]){
