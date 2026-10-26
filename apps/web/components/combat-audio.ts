@@ -1,12 +1,14 @@
+import {trexSignal,trexDuration,type TrexSound} from './trex-audio';
 import {footprint,solidTop,RADIUS,type Motion,type Solid,type Vec3,type Weapon} from '@sirocco/shared';
 export type Surface='asphalt'|'stone'|'grit'|'metal'|'wood';
-export type SynthSoundKind=Weapon;
+export type SynthSoundKind=Weapon|TrexSound;
 export type SoundKind=SynthSoundKind|'spray'|'knife'|'knife-hit'|'knife-wall'|`reload-${Weapon}`|`step-${Surface}`;
 export const isRecordedKind=(kind:SoundKind):kind is Exclude<SoundKind,SynthSoundKind>=>kind==='spray'||kind.startsWith('step-')||kind.startsWith('reload-')||kind.startsWith('knife');
-export function soundDuration(kind:SynthSoundKind){return kind==='marksman'?1.35:.85;}
+export function soundDuration(kind:SynthSoundKind){return kind.startsWith('trex-')?trexDuration(kind as TrexSound):kind==='marksman'?1.35:.85;}
 /** Layered synthesis is used for gun reports only. Knife sounds, footsteps and
  * reloads use bundled recordings and never fall back to these oscillators. */
 export function combatSignal(rate:number,kind:SynthSoundKind,variant=0){
+ if(kind.startsWith('trex-'))return trexSignal(rate,kind as TrexSound,variant);
  const duration=soundDuration(kind),out=new Float32Array(Math.ceil(rate*duration));let seed=2166136261+variant;
  for(const char of kind)seed=Math.imul(seed^char.charCodeAt(0),16777619)>>>0;
  const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/2147483648-1;};

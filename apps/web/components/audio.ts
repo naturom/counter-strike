@@ -1,3 +1,4 @@
+import type {TrexSound} from './trex-audio';
 import {RecordedAudio} from './recorded-audio';
 import {combatSignal,spatialMix,isRecordedKind,type SoundKind,type Surface} from './combat-audio';
 import {explosionSignal,type ExplosionKind} from './explosion-audio';
@@ -33,6 +34,7 @@ export class GameAudio {
     source.onended=()=>{this.voices.delete(source);if(owner&&this.reloads.get(owner)===source)this.reloads.delete(owner);source.disconnect();filter.disconnect();gain.disconnect();pan.disconnect();};
     source.start(c.currentTime+mix.delay+delay);return source;
   }
+  creature(kind:TrexSound,at:Vec3,occluded=false){this.play(kind,at,kind==='trex-step'?45:110,kind==='trex-step'?.7:.95,occluded);}
   spray(at?:Vec3,occluded=false){this.play('spray',at,18,.78,occluded);}
   shot(weapon:Weapon,at?:Vec3,occluded=false){this.play(weapon,at,140,weapon==='marksman'?1.3:.95,occluded);}
   reload(weapon:Weapon,owner:string,at?:Vec3,occluded=false){this.play(`reload-${weapon}`,at,20,.65,occluded,owner);}
