@@ -4,6 +4,7 @@ import {cutGeometryY} from './costume-geometry';
 /** Tailor an anatomical hand's irregular forearm stub to the arm's wrist seam.
  * Fingers and palm stay intact; only the final 35 mm blend into the cuff. */
 export function fitHandCuff(original:THREE.BufferGeometry,width:number,depth:number){
+ if(!original.attributes.uv)original.setAttribute('uv',new THREE.Float32BufferAttribute(new Float32Array(original.attributes.position.count*2),2));
  const geometry=cutGeometryY(original.rotateX(Math.PI/2),-.12).rotateX(-Math.PI/2),p=geometry.attributes.position,n=geometry.attributes.normal,index=geometry.index!,keep:number[]=[];
  for(let i=0;i<index.count;i+=3){const tri=[index.getX(i),index.getX(i+1),index.getX(i+2)];if(tri.every(j=>p.getZ(j)<=.120001))keep.push(...tri);}
  geometry.setIndex(keep);const compact=geometry.toNonIndexed();geometry.dispose();
@@ -22,5 +23,6 @@ export function fitHandCuff(original:THREE.BufferGeometry,width:number,depth:num
   position.setXYZ(i,THREE.MathUtils.lerp(x,Math.cos(angle)*width,weight),THREE.MathUtils.lerp(y,Math.sin(angle)*depth,weight),seam?.12:Math.min(z,.12));
   const target=new THREE.Vector3(nx,ny,0).normalize().lerp(new THREE.Vector3().fromBufferAttribute(normal,i),1-weight).normalize();normal.setXYZ(i,target.x,target.y,target.z);
  }
+ for(let i=0;i<position.count;i++)for(const axis of ['X','Y','Z'] as const)if(Math.abs(position[`get${axis}`](i))<1e-7)position[`set${axis}`](i,0);
  return compact;
 }

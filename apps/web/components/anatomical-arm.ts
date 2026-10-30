@@ -4,7 +4,7 @@ import source from './character-arm-data.json';
 
 type Style='ultraman'|'wonder-woman'|'ironman';
 type ArmData={position:string;normal:string;uv:string;index:string;weights:string;joints:number[][];handAxes:number[][]};
-type ArmShape={position:Float32Array;normal:Float32Array;weights:Float32Array;pin:Float32Array;cuff:Float32Array;wristAngles:Float32Array;cuffIndices:number[];shoulder:THREE.Vector3;elbow:THREE.Vector3;wrist:THREE.Vector3;upperInverse:THREE.Matrix4;lowerInverse:THREE.Matrix4;handInverse:THREE.Matrix4;cut:number;foreAxis:THREE.Vector3;shoulderEdge:number[];wristEdge:number[];sourceToHeld?:THREE.Matrix4};
+type ArmShape={position:Float32Array;normal:Float32Array;weights:Float32Array;pin:Float32Array;cuff:Float32Array;wristAngles:Float32Array;cuffIndices:number[];shoulder:THREE.Vector3;elbow:THREE.Vector3;wrist:THREE.Vector3;upperInverse:THREE.Matrix4;lowerInverse:THREE.Matrix4;handInverse:THREE.Matrix4;cut:number;foreAxis:THREE.Vector3;shoulderEdge:number[];wristEdge:number[];sourceToHeld?:THREE.Matrix4;seamNormals?:Float32Array};
 function bytes(s:string){return Uint8Array.from(atob(s),c=>c.charCodeAt(0));}
 const vector=(p:number[])=>new THREE.Vector3(p[0],p[1],p[2]);
 function boneFrame(a:THREE.Vector3,b:THREE.Vector3,pole:THREE.Vector3,width=1,length=1){
@@ -25,7 +25,14 @@ export function createAnatomicalArm(skin:THREE.Material,accent:THREE.Material,st
  for(let i=0;i<indices.length;i+=3)for(let j=0;j<3;j++){const a=remap[indices[i+j]],b=remap[indices[i+(j+1)%3]],k=a<b?`${a},${b}`:`${b},${a}`,edge=edges.get(k);if(edge)edge.count++;else edges.set(k,{a,b,count:1});}
  const boundary=[...new Set([...edges.values()].filter(e=>e.count===1).flatMap(e=>[e.a,e.b]))].map(i=>vector(vertex(i)));
  const along=(v:number[])=>new THREE.Vector3(v[0],v[1],v[2]).sub(elbow).dot(foreAxis),foreLength=elbow.distanceTo(wrist),emit=(poly:number[][],material:number)=>{
-  for(let i=1;i<poly.length-1;i++){for(const v of [poly[0],poly[i],poly[i+1]]){positions.push(...v.slice(0,3));normals.push(...v.slice(3,6));uvs.push(...v.slice(6,8));influences.push(...v.slice(8,12));}groups.push(material);}
+  const triangle=(a:number[],b:number[],c:number[],depth=0)=>{
+   const edge=(p:number[],q:number[])=>Math.hypot(p[0]-q[0],p[1]-q[1],p[2]-q[2]);
+   if(style!=='ironman'&&depth<2&&Math.max(along(a),along(b),along(c))>foreLength-.065&&Math.max(edge(a,b),edge(b,c),edge(c,a))>.018){
+    const mid=(p:number[],q:number[])=>p.map((v,k)=>(v+q[k])*.5),ab=mid(a,b),bc=mid(b,c),ca=mid(c,a);triangle(a,ab,ca,depth+1);triangle(ab,b,bc,depth+1);triangle(ca,bc,c,depth+1);triangle(ab,bc,ca,depth+1);return;
+   }
+   for(const v of [a,b,c]){positions.push(...v.slice(0,3));normals.push(...v.slice(3,6));uvs.push(...v.slice(6,8));influences.push(...v.slice(8,12));}groups.push(material);
+  };
+  for(let i=1;i<poly.length-1;i++)triangle(poly[0],poly[i],poly[i+1]);
  };
  for(let i=0;i<indices.length;i+=3){
   const poly=clip(clip([vertex(indices[i]),vertex(indices[i+1]),vertex(indices[i+2])],v=>along(v)-foreLength-.012),v=>v[1]-(style==='wonder-woman'?1.51:1.49));if(poly.length<3)continue;
@@ -69,6 +76,14 @@ export function anatomicalShoulder(mesh:THREE.Mesh){return (mesh.userData.anatom
 export function poseAnatomicalArm(mesh:THREE.Mesh,shoulder:THREE.Vector3,elbow:THREE.Vector3,wrist:THREE.Vector3,palm:THREE.Matrix4){
  const shape=mesh.userData.anatomicalArm as ArmShape,armInverse=mesh.parent!.matrix.clone().invert();
  const restUpper=shape.elbow.clone().sub(shape.shoulder).normalize(),restLower=shape.wrist.clone().sub(shape.elbow).normalize(),restPole=restUpper.clone().cross(restLower).normalize(),upperPole=restPole.clone().applyQuaternion(new THREE.Quaternion().setFromUnitVectors(restUpper,elbow.clone().sub(shoulder).normalize())),lowerPole=restPole.clone().applyQuaternion(new THREE.Quaternion().setFromUnitVectors(restLower,wrist.clone().sub(elbow).normalize()));
+ if(mesh.userData.style!=='ironman'){
+  // Use the actual elbow plane for both bones. A shortest rotation from the
+  // hanging rest arm becomes singular when a raised arm points the other way,
+  // spinning the skin even while all three joints move smoothly.
+  const plane=elbow.clone().sub(shoulder).cross(wrist.clone().sub(elbow));
+  if(plane.lengthSq()>1e-8){plane.normalize();upperPole.copy(plane);lowerPole.copy(plane);}
+ }
+
  const upper=boneFrame(shoulder,elbow,upperPole,1/.75,shoulder.distanceTo(elbow)/shape.shoulder.distanceTo(shape.elbow)).multiply(shape.upperInverse),lower=boneFrame(elbow,wrist,lowerPole,1/.75,elbow.distanceTo(wrist)/shape.elbow.distanceTo(shape.wrist)).multiply(shape.lowerInverse),hand=palm.clone().scale(new THREE.Vector3(1.06,1.06,1.06)).setPosition(wrist).multiply(shape.handInverse),fixed=shape.sourceToHeld?armInverse.clone().multiply(shape.sourceToHeld):upper,matrices=[upper,lower,hand,fixed],out=mesh.geometry.attributes.position,normal=mesh.geometry.attributes.normal;
  // Dual-quaternion rotation blending preserves the forearm's volume during
  // pronation. Linear matrix blending would pinch a 180-degree wrist turn shut.
@@ -99,7 +114,7 @@ export function poseAnatomicalArm(mesh:THREE.Mesh,shoulder:THREE.Vector3,elbow:T
   for(const i of shape.cuffIndices){
    const weight=shape.cuff[i];
    const p=new THREE.Vector3().fromBufferAttribute(out,i),angle=shape.wristAngles[i],target=new THREE.Vector3(Math.cos(angle)*width,Math.sin(angle)*depth,.12).applyMatrix4(palm),n=new THREE.Vector3(Math.cos(angle)/width,Math.sin(angle)/depth,0).applyMatrix3(frameNormal).normalize();p.lerp(target,weight);
-   if(mesh.userData.style==='wonder-woman'){
+   if(mesh.userData.style!=='ironman'){
     // Keep successive bracer rings behind the hand's wrist plane. Blending
     // directly toward a tilted hand could curl the middle rings past the open
     // end, producing a hollow lip despite a correctly aligned edge contour.
@@ -107,6 +122,13 @@ export function poseAnatomicalArm(mesh:THREE.Mesh,shoulder:THREE.Vector3,elbow:T
    }
    n.lerp(new THREE.Vector3().fromBufferAttribute(normal,i),1-weight).normalize();out.setXYZ(i,p.x,p.y,p.z);normal.setXYZ(i,n.x,n.y,n.z);
   }
+ }
+ if(mesh.userData.style!=='ironman'){
+  // Cuff tailoring changes the actual surface after skinning. Rebuild its
+  // lighting from that surface, retaining the shared torso boundary normals.
+  const seam=shape.seamNormals??=new Float32Array(shape.shoulderEdge.length*3);
+  shape.shoulderEdge.forEach((i,j)=>{seam[j*3]=normal.getX(i);seam[j*3+1]=normal.getY(i);seam[j*3+2]=normal.getZ(i);});
+  mesh.geometry.computeVertexNormals();shape.shoulderEdge.forEach((i,j)=>normal.setXYZ(i,seam[j*3],seam[j*3+1],seam[j*3+2]));
  }
  out.needsUpdate=true;normal.needsUpdate=true;mesh.geometry.computeBoundingBox();mesh.geometry.computeBoundingSphere();
 }

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {mergeGeometries,mergeVertices} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import {fitHandCuff} from './hand-cuff';
 
 type Grip='knife'|'grenade'|'bomb';
 const vector=(p:number[])=>new THREE.Vector3(p[0],p[1],p[2]);
@@ -16,6 +17,7 @@ function finger(points:number[][],radius:number){
   for(let j=0;j<=sides;j++){const b=j/sides*Math.PI*2,at=center.clone().addScaledVector(frames.normals[rings],Math.cos(b)*r).addScaledVector(frames.binormals[rings],Math.sin(b)*r*.88);p.push(at.x,at.y,at.z);}
  }
  for(let i=0;i<rings+capRings;i++)for(let j=0;j<sides;j++){const a=i*(sides+1)+j,b=a+sides+1;index.push(a,a+1,b,b,a+1,b+1);}
+ const start=p.length/3;p.push(...path.getPointAt(0).toArray());for(let j=0;j<sides;j++)index.push(start,j+1,j);
  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(p,3));geometry.setIndex(index);geometry.computeVertexNormals();return geometry.toNonIndexed();
 }
 function palm(){
@@ -56,10 +58,11 @@ function shape(kind:Grip,left:boolean,typing=false,relaxed=false){
  }
  return merged;
 }
-/** Item-specific Ultraman gloves, in the same wrist frame as the anatomical hands. */
-export function createSuitGrip(material:THREE.Material,left:boolean,kind:Grip,relaxed=false){
- const group=new THREE.Group(),geometry=shape(kind,left,false,relaxed),mesh=new THREE.Mesh(geometry,material);group.name='ultraman-equipment-grip';mesh.castShadow=mesh.receiveShadow=true;group.add(mesh);
- if(kind==='bomb'&&!left){const typing=shape(kind,left,true);geometry.morphAttributes.position=[typing.attributes.position.clone()];geometry.morphAttributes.normal=[typing.attributes.normal.clone()];typing.dispose();mesh.updateMorphTargets();group.userData.typingMesh=mesh;}
+/** Item-specific grips in the same wrist frame as the anatomical hands. */
+export function createSuitGrip(material:THREE.Material,left:boolean,kind:Grip,relaxed=false,female=false){
+ const make=(typing=false)=>{const g=shape(kind,left,typing,relaxed);if(female)g.scale(.84,.84,.90);return fitHandCuff(g,female?.028:.034,female?.021:.027);};
+ const group=new THREE.Group(),geometry=make(),mesh=new THREE.Mesh(geometry,material);group.name=female?'wonder-woman-equipment-grip':'ultraman-equipment-grip';mesh.castShadow=mesh.receiveShadow=true;group.add(mesh);
+ if(kind==='bomb'&&!left){const typing=make(true);geometry.morphAttributes.position=[typing.attributes.position.clone()];geometry.morphAttributes.normal=[typing.attributes.normal.clone()];typing.dispose();mesh.updateMorphTargets();group.userData.typingMesh=mesh;}
  group.userData.gripKind=kind;
  return group;
 }
