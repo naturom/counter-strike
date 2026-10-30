@@ -25,7 +25,14 @@ test('authoritative bullet and knife marks are shared, bounded, copied, expired 
  const copy=sim.snapshot();copy.impacts[0].ray.origin.x=90;copy.impacts[0].position.z=90;assert.equal(sim.impacts[0].ray.origin.x,0);assert.ok(sim.impacts[0].position.z<0);
  p.weapon='knife';p.z=-.3;sim.fire(p);assert.equal(sim.impacts.at(-1)!.weapon,'knife');
  for(let i=0;i<IMPACT_RULES.limit+8;i++)sim.fire(p);assert.equal(sim.impacts.length,IMPACT_RULES.limit);assert.ok(sim.impacts[0].id>2);
- sim.time=IMPACT_RULES.lifetimeMs+1;sim.step();assert.equal(sim.impacts.length,0);sim.fire(p);assert.equal(sim.impacts.length,1);sim.phase='finished';sim.rematch();assert.equal(sim.snapshot().impacts.length,0);
+ sim.time=IMPACT_RULES.knifeLifetimeMs+1;sim.step();assert.equal(sim.impacts.length,0);sim.fire(p);assert.equal(sim.impacts.length,1);sim.phase='finished';sim.rematch();assert.equal(sim.snapshot().impacts.length,0);
+});
+test('every gun leaves a five-second mark while knife marks keep their longer lifetime',()=>{
+ const sim=new Simulation([wall]),p=sim.add('a','A');Object.assign(p,{x:0,y:0,z:0,yaw:0,pitch:0});
+ for(const weapon of ['rifle','pistol','smg','marksman'] as const){p.weapon=p.primary=weapon;p.ammo[weapon]=10;sim.fire(p);const mark=sim.impacts.at(-1)!;assert.equal(mark.weapon,weapon);assert.equal(mark.expiresAt-mark.at,5000);}
+ p.weapon='knife';p.z=-.3;sim.fire(p);assert.equal(sim.impacts.at(-1)!.expiresAt,IMPACT_RULES.knifeLifetimeMs);
+ sim.time=4900;sim.step();assert.equal(sim.impacts.length,5,'marks remain visible before five seconds');
+ sim.time=5000;sim.step();assert.deepEqual(sim.snapshot().impacts.map(m=>m.weapon),['knife'],'expired bullets are removed from the shared state');
 });
 test('players including friendly and protected targets block marks on the wall behind them',()=>{
  for(const protectedTarget of [false,true]){

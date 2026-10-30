@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {DecalGeometry} from 'three/examples/jsm/geometries/DecalGeometry.js';
+import {surfaceDecalGeometry} from './surface-decals';
 import type {Vec3,Spray} from '@sirocco/shared';
 
 /** Original painted emblem, drawn at runtime with no external image dependency. */
@@ -51,7 +51,7 @@ export class SprayMarks {
    const hit=ray.intersectObject(map,true).find(h=>h.object instanceof THREE.Mesh);if(!hit||hit.point.distanceTo(position)>.7)continue;
    position.copy(hit.point);if(hit.face){normal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld);if(normal.dot(ray.ray.direction)>0)normal.negate();}
    const rotation=sprayRotation(normal,spray.ray?.direction);
-   const geometry=new DecalGeometry(hit.object as THREE.Mesh,position,rotation,new THREE.Vector3(spray.size??1.15,spray.size??1.15,.10)),mesh=new THREE.Mesh(geometry,this.material);mesh.renderOrder=2;mesh.receiveShadow=true;this.scene.add(mesh);this.marks.set(spray.id,mesh);
+   const geometry=surfaceDecalGeometry(hit.object as THREE.Mesh,position,rotation,new THREE.Vector3(spray.size??1.15,spray.size??1.15,.10)),mesh=new THREE.Mesh(geometry,this.material);mesh.renderOrder=2;mesh.receiveShadow=true;this.scene.add(mesh);this.marks.set(spray.id,mesh);
   }
  }
  clear(){for(const mesh of this.marks.values()){mesh.removeFromParent();mesh.geometry.dispose();}this.marks.clear();}

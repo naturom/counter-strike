@@ -191,15 +191,16 @@ vehicle('CT truck',429,148,57,23,2.1,0,true);
 
 const landmark = (name:string,u:number,v:number)=>({name,...dustPoint(u,v)});
 export const DUST2:MapDefinition={
-  id:'dunes',name:'Dust III',subtitle:'Long · Mid · Tunnels',description:'Fight from the hotel at A to the kasbah at B. Long sightlines, raised catwalks and a covered tunnel flank.',solids,
+  id:'dunes',name:'Dust III',subtitle:'Long · Mid · Tunnels',description:'Defend the CT courtyard at A or the T terrace at B. Attack through Long, Mid and the covered tunnel routes.',solids,
   bounds:{minX:-54,maxX:54,minZ:-57,maxZ:57},
   spawns:{red:[dustPoint(380,930,3.2),dustPoint(330,930,3.2),dustPoint(430,930,3.2),dustPoint(280,930,3.2)],blue:[dustPoint(590,225),dustPoint(590,190),dustPoint(563,225),dustPoint(590,260)]},
   pickups:[{id:'west-smg',...dustPoint(380,908,3.2),weapon:'smg',availableAt:0},{id:'east-smg',...dustPoint(590,247),weapon:'smg',availableAt:0},{id:'mid-dmr',...dustPoint(461,607,2.1*(607-438)/182),weapon:'marksman',availableAt:0},{id:'court-dmr',...dustPoint(115,453,3.2),weapon:'marksman',availableAt:0}],
-  // Marker placement and authoritative plant areas share this definition. B
-  // includes the entire raised platform as well as its courtyard approach.
+  // Each defender starts close to its own objective: Blue defends A in the
+  // clear CT courtyard; Red defends B on the T terrace. Markers and planting
+  // bounds move together, with the correct height for each existing floor.
   bombSites:[
-    {id:'A',...dustPoint(786,170),w:103*DUST_SCALE,d:68*DUST_SCALE,minY:3.7,maxY:3.9,marker:{...dustPoint(813,174,3.8),size:3.6}},
-    {id:'B',...dustPoint(195,192),w:118*DUST_SCALE,d:148*DUST_SCALE,minY:1.9,maxY:2.75,marker:{...dustPoint(217,164,2.65),size:2.8}},
+    {id:'A',...dustPoint(548,248),w:64*DUST_SCALE,d:56*DUST_SCALE,minY:-.1,maxY:.1,marker:{...dustPoint(548,248),size:3.6}},
+    {id:'B',...dustPoint(355,905),w:64*DUST_SCALE,d:40*DUST_SCALE,minY:3.1,maxY:3.3,marker:{...dustPoint(355,905,3.2),size:3.6}},
   ],
-  landmarks:[landmark('A',815,130),landmark('B',186,199),landmark('T SPAWN',377,939),landmark('CT SPAWN',590,222),landmark('LONG',879,423),landmark('PIT',885,626),landmark('MID',470,510),landmark('TOWER',567,525),landmark('SHORT',646,310),landmark('TUNNELS',160,460)],
+  landmarks:[landmark('A',548,248),landmark('B',355,905),landmark('T SPAWN',377,939),landmark('CT SPAWN',590,222),landmark('LONG',879,423),landmark('PIT',885,626),landmark('MID',470,510),landmark('TOWER',567,525),landmark('SHORT',646,310),landmark('TUNNELS',160,460)],
 };

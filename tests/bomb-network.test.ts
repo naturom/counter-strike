@@ -16,14 +16,14 @@ test('signed defusal room supports both team plants, an enemy defuse, and the re
   const b=await reserve({nickname:'Defuser',invite:a.invite,mapId:'relay',mode:'deathmatch'});assert.equal(b.mode,'defusal');assert.equal(b.mapId,'dunes');
   const blue=await new Client(base.replace('http:','ws:')).consumeSeatReservation(b.reservation);rooms.push(blue);blue.onMessage('snapshot',()=>{});blue.onMessage('combat',()=>{});blue.onMessage('votes',()=>{});
   await until(()=>!!state?.roundLive);const sim=activeRooms.get(red.roomId)!.sim;
-  Object.assign(sim.players.get(red.sessionId)!,dustPoint(820,190,3.8));let rseq=0,bseq=0;
+  Object.assign(sim.players.get(red.sessionId)!,MAPS.dunes.bombSites!.find(site=>site.id==='A')!.marker);let rseq=0,bseq=0;
   const planting=setInterval(()=>red.send('input',{...neutralInput(),seq:++rseq,weapon:'bomb',fire:true}),1000/30);timers.push(planting);
   await until(()=>state?.bomb?.status==='planted',7000);clearInterval(planting);assert.equal(state?.bomb?.siteId,'A');
   const marker=MAPS.dunes.bombSites!.find(site=>site.id==='B')!.marker;
   Object.assign(sim.players.get(blue.sessionId)!,{x:marker.x,y:marker.y,z:marker.z});
   const bluePlant=setInterval(()=>blue.send('input',{...neutralInput(),seq:++bseq,weapon:'bomb',fire:true}),1000/30);timers.push(bluePlant);
   await until(()=>state?.bombs[1].status==='planted',7000);clearInterval(bluePlant);assert.equal(state?.bombs[1].siteId,'B');
-  Object.assign(sim.players.get(blue.sessionId)!,dustPoint(820,190,3.8));
+  Object.assign(sim.players.get(blue.sessionId)!,MAPS.dunes.bombSites!.find(site=>site.id==='A')!.marker);
   const defusing=setInterval(()=>blue.send('input',{...neutralInput(),seq:++bseq,interact:true}),1000/30);timers.push(defusing);
   await until(()=>state?.bomb?.action?.kind==='defuse');await until(()=>state?.bomb?.status==='defused',14000);assert.equal(state?.phase,'playing');
   sim.time=sim.bombs[1].explodeAt;await until(()=>state?.phase==='finished');

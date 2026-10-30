@@ -3,6 +3,8 @@ import {mergeGeometries} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {equipmentModel} from './weapon-models';
 import {buildDust} from './dust-world';
 import {facadeCable} from './environment-details';
+import {naturalSand} from './sand-material';
+import {indexStaticMesh} from './static-mesh-index';
 import {MAPS,type MapId,type Equipment,type AvatarId} from '@sirocco/shared';
 export function disposeGroup(group:THREE.Object3D){group.traverse(o=>{if(o instanceof THREE.Mesh||o instanceof THREE.Line)o.geometry.dispose();});group.removeFromParent();}
 export class WorldArt {
@@ -11,7 +13,7 @@ export class WorldArt {
   constructor(renderer:THREE.WebGLRenderer){
     const load=(name:string,color=false)=>{const t=new THREE.TextureLoader().load(`/textures/${name}.jpg`);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());if(color)t.colorSpace=THREE.SRGBColorSpace;this.textures.push(t);return t;};
     this.stone=this.material('#ddc6a3',{map:load('stone-color',true),normalMap:load('stone-normal'),roughnessMap:load('stone-rough'),normalScale:new THREE.Vector2(.6,.6)});
-    this.sand=this.material('#c6b591',{map:load('sand-color',true),normalMap:load('sand-normal'),roughnessMap:load('sand-rough'),normalScale:new THREE.Vector2(.55,.55)});
+    this.sand=naturalSand(this.material('#c6b591',{map:load('sand-color',true),normalMap:load('sand-normal'),roughness:.96,normalScale:new THREE.Vector2(.24,.24)}));
     this.plaster=this.material('#f4eee0',{map:load('plaster-color',true),normalMap:load('plaster-normal'),roughnessMap:load('plaster-rough'),normalScale:new THREE.Vector2(.5,.5)});
     this.paving=this.material('#d2c8b4',{map:load('paving-color',true),normalMap:load('paving-normal'),roughnessMap:load('paving-rough'),normalScale:new THREE.Vector2(.45,.45)});
     this.timber=this.material('#a48a68',{map:load('timber-color',true),normalMap:load('timber-normal'),roughnessMap:load('timber-rough'),normalScale:new THREE.Vector2(.35,.35)});
@@ -72,7 +74,7 @@ export class WorldArt {
     root.traverse(o=>{if(o instanceof THREE.Mesh&&!Array.isArray(o.material)){const geometry=(o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone()).applyMatrix4(o.matrixWorld);if((o.material as THREE.MeshStandardMaterial).vertexColors&&!geometry.attributes.color){const colors=new Float32Array(geometry.attributes.position.count*3).fill(1);geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));}const key=`${o.material.uuid}:${o.castShadow}:${o.receiveShadow}`;const batch=batches.get(key)??{material:o.material,cast:o.castShadow,receive:o.receiveShadow,geometries:[] as THREE.BufferGeometry[]};batch.geometries.push(geometry);batches.set(key,batch);originals.push(o);}});
     for(const mesh of originals){mesh.removeFromParent();mesh.geometry.dispose();}
     for(const {material,cast,receive,geometries} of batches.values()){const merged=mergeGeometries(geometries);for(const geometry of geometries)geometry.dispose();if(merged){const mesh=new THREE.Mesh(merged,material);mesh.castShadow=cast;mesh.receiveShadow=receive;root.add(mesh);}}
-    return root;
+    root.traverse(o=>{if(o instanceof THREE.Mesh)indexStaticMesh(o);});return root;
   }
   private palm(root:THREE.Group,x:number,z:number){const trunk=this.wood,leaf=this.material('#64704b',{side:THREE.DoubleSide});this.cylinder(root,.15,.28,6.7,trunk,x,3.35,z);for(let i=0;i<9;i++){const g=new THREE.Group();g.position.set(x,6.5,z);g.rotation.y=i*Math.PI*2/9;for(let j=0;j<8;j++){const mesh=new THREE.Mesh(new THREE.PlaneGeometry(.7-j*.06,.75),leaf);mesh.position.set(0,-j*j*.022,-j*.38);mesh.rotation.x=-Math.PI/2-j*.07;mesh.rotation.z=(j%2?.12:-.12);g.add(mesh);}root.add(g);}}
   weapon(kind:Equipment,viewmodel=true,heldByAvatar=false,avatar:AvatarId='operator'){return equipmentModel(this,kind,viewmodel,heldByAvatar,avatar);}

@@ -115,11 +115,12 @@ export function wallSignMount(walls:Solid[],near:{x:number;z:number},width:numbe
  if(!best)throw new Error('No wall edge wide enough for sign');return best;
 }
 export const DUST_ROUTE_SIGNS=[
- {u:422,v:695,y:4,text:'← B',wall:'Western central block'},
- {u:550,v:840,y:4.7,text:'A →',wall:'T spawn island'},
- {u:435,v:320,y:2.3,text:'B ←',wall:'Lower tunnels block'},
- {u:850,v:318,y:4.3,text:'A ↑',wall:'Catwalk east block'},
- {u:78,v:238,y:4.3,text:'B',wall:'Perimeter'},
+ {u:355,v:881,y:4.9,text:'B',wall:'T spawn mid screen'},
+ {u:548,v:213,y:2.3,text:'A',wall:'Northern kasbah'},
+ {u:422,v:695,y:4,text:'B · T',wall:'Western central block'},
+ {u:550,v:840,y:4.7,text:'B · T',wall:'T spawn island'},
+ {u:435,v:320,y:2.3,text:'A · CT',wall:'Lower tunnels block'},
+ {u:850,v:318,y:4.3,text:'A · CT',wall:'Catwalk east block'},
 ] as const;
 
 /** Thin road paint follows the terrain across slopes and their landing seams. */

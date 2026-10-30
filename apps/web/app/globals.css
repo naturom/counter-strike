@@ -33,3 +33,9 @@
 
 .avatar-picker{grid-template-columns:repeat(3,minmax(0,160px))}
 @media(max-width:700px){.avatar-picker .avatar-thumb{height:130px}}
+
+.team-appearance-stage{max-width:460px;padding:20px}.team-appearances{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:16px}.team-appearance{min-width:0;margin:0;border:1px solid #d3d9c62b;background:#14231e55}.team-appearance .avatar-preview-canvas{height:300px}.team-appearance figcaption{border-top:1px solid #d3d9c62b;padding:12px 4px}.team-appearance figcaption span{font:10px var(--mono);letter-spacing:1.4px}.team-appearance h2{font:600 29px var(--display);margin:5px 0 0;color:var(--paper)}.team-assignment-note{font-size:12px;line-height:1.5;color:var(--muted);margin:16px 0 0}@media(max-width:1000px){.team-appearance-stage{min-width:260px}.team-appearance .avatar-preview-canvas{height:240px}.team-appearance h2{font-size:24px}}@media(max-width:700px){.team-appearance-stage{min-width:0}.team-appearance .avatar-preview-canvas{height:280px}}
+.player-callsign{display:block;max-width:240px;margin:6px 0 1px;font:600 14px Barlow,sans-serif;color:var(--paper);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.next-game-countdown{margin-top:24px;padding:16px 20px;background:rgba(229,218,185,.07);border:1px solid rgba(229,218,185,.22);text-align:center;font:500 17px Barlow,sans-serif;color:var(--paper)}
+.next-game-countdown strong{display:inline-block;min-width:2ch;margin-left:6px;color:var(--orange);font-size:26px}

@@ -3,7 +3,7 @@ import {wallDistance,type Vec3,type Solid} from '@sirocco/shared';
 import type {ExplosionKind} from './explosion-audio';
 export const EXPLOSION_VISUAL_SECONDS={grenade:4,bomb:10} as const;
 type Puff={sprite:THREE.Sprite;origin:THREE.Vector3;velocity:THREE.Vector3;size:number;delay:number;life:number;spin:number;rotation:number;kind:'fire'|'smoke'|'dust'};
-type Blast={root:THREE.Group;start:number;duration:number;kind:ExplosionKind;puffs:Puff[];flash:THREE.Sprite;light:THREE.PointLight;ring:THREE.Mesh;scorch?:THREE.Mesh;embers:THREE.Points;velocities:THREE.Vector3[]};
+type Blast={root:THREE.Group;start:number;duration:number;kind:ExplosionKind;puffs:Puff[];flash:THREE.Sprite;ring:THREE.Mesh;scorch?:THREE.Mesh;embers:THREE.Points;velocities:THREE.Vector3[]};
 function cloudTexture(){
   const canvas=document.createElement('canvas');canvas.width=canvas.height=128;const c=canvas.getContext('2d')!;
   // Overlapping soft lobes give the smoke an irregular, volumetric silhouette.
@@ -23,8 +23,16 @@ function flashTexture(){const canvas=document.createElement('canvas');canvas.wid
  * owns/disposes every transient resource independently of gameplay physics. */
 export class ExplosionEffects {
   private blasts:Blast[]=[];
+  private lights:THREE.PointLight[]=[];private lightRoot=new THREE.Group();
+  private smokeColour=new THREE.Color('#a39b8d');
   private cloud:THREE.Texture;private glow:THREE.Texture;
-  constructor(private scene:THREE.Scene,private reducedMotion=false,textures?:{cloud:THREE.Texture;glow:THREE.Texture}){this.cloud=textures?.cloud??cloudTexture();this.glow=textures?.glow??flashTexture();}
+  constructor(private scene:THREE.Scene,private reducedMotion=false,textures?:{cloud:THREE.Texture;glow:THREE.Texture}){
+    this.cloud=textures?.cloud??cloudTexture();this.glow=textures?.glow??flashTexture();
+    // Keep the light count stable. Adding/removing a light recompiles every lit
+    // scenery/character shader, causing a hitch at the busiest combat moments.
+    this.lightRoot.name='explosionLights';this.scene.add(this.lightRoot);
+    for(let i=0;i<2;i++){const light=new THREE.PointLight('#ffcb85',0,30,2);this.lightRoot.add(light);this.lights.push(light);}
+  }
   get activeCount(){return this.blasts.length;}
   spawn(at:Vec3,kind:ExplosionKind,now:number,solids:Solid[]=[]){
     while(this.blasts.length>=4)this.remove(this.blasts.shift()!);
@@ -47,7 +55,6 @@ export class ExplosionEffects {
       }
     }
     const flash=sprite(true);flash.position.y=.35;
-    const light=new THREE.PointLight('#ffcb85',0,bomb?30:14,2);light.position.y=.8;root.add(light);
     const ring=new THREE.Mesh(new THREE.PlaneGeometry(2,2),new THREE.MeshBasicMaterial({map:this.cloud,color:'#bdac8e',transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false}));ring.rotation.x=-Math.PI/2;ring.position.y=ground?.06-down:0;ring.visible=ground;root.add(ring);
     let scorch:THREE.Mesh|undefined;
     if(ground){scorch=new THREE.Mesh(new THREE.PlaneGeometry(bomb?7:2.4,bomb?7:2.4),new THREE.MeshBasicMaterial({map:this.cloud,color:'#1d1915',transparent:true,opacity:.38,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2}));scorch.rotation.x=-Math.PI/2;scorch.position.y=-down+.065;root.add(scorch);}
@@ -55,14 +62,15 @@ export class ExplosionEffects {
     for(let i=0;i<positions.length/3;i++){const a=random()*Math.PI*2,speed=3+random()*(bomb?13:8);velocities.push(new THREE.Vector3(Math.cos(a)*speed,1+random()*6,Math.sin(a)*speed));}
     const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
     const embers=new THREE.Points(geometry,new THREE.PointsMaterial({color:'#ffbd6c',size:.055,transparent:true,opacity:1,depthWrite:false,blending:THREE.AdditiveBlending}));root.add(embers);
-    this.blasts.push({root,start:now,duration,kind,puffs,flash,light,ring,scorch,embers,velocities});this.update(now);
+    this.blasts.push({root,start:now,duration,kind,puffs,flash,ring,scorch,embers,velocities});this.update(now);
   }
   update(now:number){
     for(const blast of this.blasts){
       const t=Math.max(0,(now-blast.start)/1000),bomb=blast.kind==='bomb';
       blast.flash.scale.setScalar((bomb?3.8:1.8)*(1+t*8));blast.flash.material.opacity=Math.max(0,1-t/(bomb?.18:.09))*(this.reducedMotion?.3:.9);
-      blast.light.intensity=(bomb?160:60)*Math.exp(-t*18)*(this.reducedMotion?.2:1);
+      blast.flash.visible=blast.flash.material.opacity>.001;
       const ringAge=t/(bomb?.7:.4);blast.ring.scale.setScalar(1+ringAge*(bomb?14:7));(blast.ring.material as THREE.MeshBasicMaterial).opacity=Math.max(0,1-ringAge)*.18;
+      blast.ring.visible=ringAge<1&&!!blast.scorch;
       if(blast.scorch)(blast.scorch.material as THREE.MeshBasicMaterial).opacity=.38*Math.min(1,Math.max(0,blast.duration-t)/2);
       for(const p of blast.puffs){
         const age=t-p.delay,k=age/p.life;p.sprite.visible=age>=0&&k<1;if(!p.sprite.visible)continue;
@@ -73,15 +81,19 @@ export class ExplosionEffects {
         const fadeIn=Math.min(1,age/(p.kind==='fire'?.025:.17)),fadeOut=Math.max(0,1-k)**(p.kind==='fire'?1.9:1.15);
         p.sprite.material.opacity=fadeIn*fadeOut*(p.kind==='fire'?.95:p.kind==='dust'?.4:.62);
         if(p.kind==='fire')p.sprite.material.color.setRGB(bomb?1.6:1,Math.max(.12,.85-k*.7),Math.max(.025,.3-k*.35));
-        else if(p.kind==='smoke')p.sprite.material.color.set(bomb?'#51473b':'#857b69').lerp(new THREE.Color('#a39b8d'),Math.min(1,k*1.4));
+        else if(p.kind==='smoke')p.sprite.material.color.set(bomb?'#51473b':'#857b69').lerp(this.smokeColour,Math.min(1,k*1.4));
       }
+      blast.embers.visible=t<(bomb?1.9:1.2);if(!blast.embers.visible)continue;
       const positions=blast.embers.geometry.attributes.position,emberTime=Math.min(t,bomb?1.9:1.2);
       for(let i=0;i<positions.count;i++){const v=blast.velocities[i];positions.setXYZ(i,v.x*emberTime,Math.max(0,v.y*emberTime-6*emberTime*emberTime),v.z*emberTime);}
       positions.needsUpdate=true;blast.embers.geometry.computeBoundingSphere();(blast.embers.material as THREE.PointsMaterial).opacity=Math.max(0,1-t/(bomb?1.9:1.2));
     }
     this.blasts=this.blasts.filter(blast=>{if(now-blast.start<blast.duration*1000)return true;this.remove(blast);return false;});
+    const bright=this.blasts.filter(b=>now-b.start<450).sort((a,b)=>this.intensity(b,now)-this.intensity(a,now));
+    this.lights.forEach((light,i)=>{const blast=bright[i];light.intensity=blast?this.intensity(blast,now):0;if(blast){light.position.copy(blast.root.position);light.position.y+=.8;light.distance=blast.kind==='bomb'?30:14;}});
   }
-  private remove(blast:Blast){blast.root.removeFromParent();blast.root.traverse(o=>{if(o instanceof THREE.Mesh||o instanceof THREE.Points)o.geometry.dispose();if(o instanceof THREE.Mesh||o instanceof THREE.Points||o instanceof THREE.Sprite){const materials=Array.isArray(o.material)?o.material:[o.material];materials.forEach(m=>m.dispose());}});blast.light.dispose();}
-  clear(){this.blasts.forEach(b=>this.remove(b));this.blasts=[];}
-  destroy(){this.clear();this.cloud.dispose();this.glow.dispose();}
+  private intensity(blast:Blast,now:number){return(blast.kind==='bomb'?160:60)*Math.exp(-Math.max(0,now-blast.start)*.018)*(this.reducedMotion?.2:1);}
+  private remove(blast:Blast){blast.root.removeFromParent();blast.root.traverse(o=>{if(o instanceof THREE.Mesh||o instanceof THREE.Points)o.geometry.dispose();if(o instanceof THREE.Mesh||o instanceof THREE.Points||o instanceof THREE.Sprite){const materials=Array.isArray(o.material)?o.material:[o.material];materials.forEach(m=>m.dispose());}});}
+  clear(){this.blasts.forEach(b=>this.remove(b));this.blasts=[];for(const light of this.lights)light.intensity=0;}
+  destroy(){this.clear();this.lightRoot.removeFromParent();for(const light of this.lights)light.dispose();this.cloud.dispose();this.glow.dispose();}
 }

@@ -24,7 +24,7 @@ function fixture(run:(art:WorldArt)=>void){
 }
 test('all appearances collapse to the floor with attached limbs, remain still and revive upright',()=>fixture(art=>{
  for(const appearance of AVATARS){
-  const sim=new Simulation([]),p=sim.add('a','A',appearance.id),attacker=sim.add('b','B');Object.assign(p,{x:0,y:0,z:0,yaw:0,protectedUntil:0});Object.assign(attacker,{x:0,z:3});sim.damage(p,100,attacker,'rifle',attacker);
+  const sim=new Simulation([]),p=sim.add('a','A'),attacker=sim.add('b','B');Object.assign(p,{avatar:appearance.id,x:0,y:0,z:0,yaw:0,protectedUntil:0});Object.assign(attacker,{x:0,z:3});sim.damage(p,100,attacker,'rifle',attacker);
   const model=buildAvatar(art,p.avatar);equipAvatarModel(art,model,'rifle',p.avatar);model.visible=true;const deaths=new DeadBodies();
   deaths.pose(model,p,sim.time,[]);assert.ok(model.up.clone().applyQuaternion(model.quaternion).y>.99);
   for(let i=1;i<=6;i++)deaths.pose(model,p,sim.time+i*160,[]);

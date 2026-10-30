@@ -1,6 +1,6 @@
 import {TrexSimulation} from './trex-simulation';
 import {randomUUID} from 'node:crypto';
-import {DT,TREX_RULES,rayTrex,type Trex,RESPAWN_MS,IMPACT_RULES,impactTarget,type ImpactMark,RADIUS,fallDamage,validAvatar,type AvatarId,sprayTarget,type Spray,BOMB_RULES,plantSite,canReachBomb,footprint,solidTop,intersects,ROUND_MS,WIN_SCORE,MAPS,DEFAULT_MAP,WEAPONS,KNIFE,isGun,direction,move,neutralInput,rayBox,rayPlayer,type HitZone,wallDistance,heightOf,eyeOf,nearestPickup,type Input,type Player,type Snapshot,type CombatEvent,type Solid,type Team,type MapId,type Pickup,type Grenade,type Equipment,type Vec3,type GameMode,type BombState} from '@sirocco/shared';
+import {DT,NEXT_GAME_COUNTDOWN_MS,BOMB_RESULT_DELAY_MS,TREX_RULES,rayTrex,type Trex,RESPAWN_MS,IMPACT_RULES,impactTarget,type ImpactMark,RADIUS,fallDamage,TEAMS,sprayTarget,type Spray,BOMB_RULES,plantSite,canReachBomb,footprint,solidTop,intersects,ROUND_MS,WIN_SCORE,MAPS,DEFAULT_MAP,WEAPONS,KNIFE,isGun,direction,move,neutralInput,rayBox,rayPlayer,type HitZone,wallDistance,heightOf,eyeOf,nearestPickup,type Input,type Player,type Snapshot,type CombatEvent,type Solid,type Team,type MapId,type Pickup,type Grenade,type Equipment,type Vec3,type GameMode,type BombState} from '@sirocco/shared';
 const freshAmmo=()=>({rifle:30,pistol:12,smg:0,marksman:0});
 export class Simulation {
   players=new Map<string,Player>();
@@ -14,32 +14,35 @@ export class Simulation {
   events:CombatEvent[]=[];
   sprays:Spray[]=[];impacts:ImpactMark[]=[];
   scores={red:0,blue:0};
-  time=0;endsAt=ROUND_MS;phase:Snapshot['phase']='playing';winner:Snapshot['winner']=null;
+  time=0;endsAt=ROUND_MS;nextRoundAt=0;phase:Snapshot['phase']='playing';winner:Snapshot['winner']=null;
   bombs:BombState[]=[];get bomb(){return this.bombs[0]??null;}outcome='';roundLive=false;
   private bombIntents=new Map<string,{input:Input;at:number}>();
   round=1;readonly matchId=randomUUID();
   readonly mapId:MapId;
   solids:Solid[];pickups:Pickup[];grenades:Grenade[]=[];readonly wildlife:TrexSimulation;get trexes(){return this.wildlife.creatures;}
   constructor(mapOrSolids:MapId|Solid[]=DEFAULT_MAP,readonly mode:GameMode='deathmatch'){this.mapId=typeof mapOrSolids==='string'?mapOrSolids:'relay';this.solids=typeof mapOrSolids==='string'?MAPS[mapOrSolids].solids:mapOrSolids;this.pickups=MAPS[this.mapId].pickups.map(p=>({...p}));this.wildlife=new TrexSimulation(MAPS[this.mapId],()=>this.solids);if(mode==='defusal'){if(this.mapId!=='dunes')throw new Error('Bomb Defusal requires Dust III');this.endsAt=0;this.resetBomb();}}
-  add(id:string,name:string,avatar:AvatarId='ironman'):Player {
-    avatar=validAvatar(avatar)?avatar:'ironman';
+  add(id:string,name:string):Player {
     if(this.players.size>=8)throw new Error('Room full (8/8).');
     const red=[...this.players.values()].filter(p=>p.team==='red').length,blue=this.players.size-red;
     const team:Team=red<=blue?'red':'blue';
-    const p:Player={id,name,team,avatar,x:0,y:0,z:0,vy:0,grounded:true,crouched:false,yaw:team==='red'?0:Math.PI,pitch:0,hp:100,kills:0,deaths:0,weapon:'rifle',primary:'rifle',ammo:freshAmmo(),grenades:2,reloadUntil:0,respawnAt:0,protectedUntil:0,connected:true,ack:0};
-    this.players.set(id,p);this.queues.set(id,[]);this.spawn(p);if(this.mode==='defusal'){if(this.roundLive){p.hp=0;p.respawnAt=0;}else{const bomb=this.bombs.find(b=>b.team===team);if(bomb?.status==='dropped'&&!bomb.carrierId){bomb.status='carried';bomb.carrierId=id;}}}return p;
+    const p:Player={id,name,team,avatar:TEAMS[team].avatar,x:0,y:0,z:0,vy:0,grounded:true,crouched:false,yaw:team==='red'?0:Math.PI,pitch:0,hp:100,kills:0,deaths:0,weapon:'rifle',primary:'rifle',ammo:freshAmmo(),grenades:2,reloadUntil:0,respawnAt:0,protectedUntil:0,connected:true,ack:0};
+    this.players.set(id,p);this.queues.set(id,[]);this.spawn(p);if(this.mode==='defusal'&&this.roundLive){p.hp=0;p.respawnAt=0;}return p;
   }
   remove(id:string){this.falls.delete(id);this.dropBomb(id);this.bombIntents.delete(id);this.players.delete(id);this.queues.delete(id);this.lastSeq.delete(id);this.nextShot.delete(id);this.trigger.delete(id);this.actions.delete(id);}
   input(id:string,i:Input){const prev=this.lastSeq.get(id)??0;if(i.seq<=prev||i.seq-prev>120)return;this.lastSeq.set(id,i.seq);const q=this.queues.get(id);if(!q)return;if(q.length>=8)q.shift();q.push(i);}
   spawn(p:Player){
+    p.avatar=TEAMS[p.team].avatar;
     this.falls.delete(p.id);
     const others=[...this.players.values()].filter(o=>o.id!==p.id&&o.hp>0);
     const spots=MAPS[this.mapId].spawns[p.team].map(s=>({s,safety:Math.min(...others.map(o=>Math.hypot(o.x-s.x,o.z-s.z)),100)}));spots.sort((a,b)=>b.safety-a.safety);
     Object.assign(p,spots[0].s,{hp:100,vy:0,grounded:true,crouched:false,ammo:freshAmmo(),weapon:'rifle',primary:'rifle',grenades:2,reloadUntil:0,respawnAt:0,death:undefined,protectedUntil:this.time+1500,yaw:p.team==='red'?0:Math.PI,pitch:0});
     this.queues.set(p.id,[]);this.trigger.delete(p.id);this.actions.set(p.id,{interact:false,throwAt:0});this.nextShot.set(p.id,this.time+100);
+    // Solo practice respawns reuse the round. Return only a dropped team charge;
+    // a planted C4 or one already carried by a teammate must remain untouched.
+    if(this.mode==='defusal'&&!this.roundLive&&p.connected){const bomb=this.bombs.find(b=>b.team===p.team);if(bomb?.status==='dropped'&&!bomb.carrierId)Object.assign(bomb,{x:p.x,y:p.y,z:p.z,status:'carried',carrierId:p.id,siteId:null,explodeAt:0,action:null});}
   }
   step(){
-    this.time+=DT*1000;this.events=[];this.sprays=this.sprays.filter(s=>s.expiresAt>this.time);this.impacts=this.impacts.filter(s=>s.expiresAt>this.time);if(this.phase==='finished')return;
+    this.time+=DT*1000;this.events=[];this.sprays=this.sprays.filter(s=>s.expiresAt>this.time);this.impacts=this.impacts.filter(s=>s.expiresAt>this.time);if(this.phase==='finished'){if(!this.nextRoundAt)this.scheduleNextGame();if(this.time+.001>=this.nextRoundAt)this.rematch();return;}
     if(this.mode==='defusal'&&!this.roundLive&&['red','blue'].every(team=>[...this.players.values()].some(p=>p.team===team&&p.connected&&p.hp>0)))this.roundLive=true;
     if(this.mode==='deathmatch'&&this.time>=this.endsAt){this.finish();return;}
     for(const p of this.players.values()){
@@ -109,7 +112,7 @@ export class Simulation {
     const to={x:from.x+dir.x*distance,y:from.y+dir.y*distance,z:from.z+dir.z*distance};
     const hit=target&&target.team!==p.team&&target.protectedUntil<=this.time?target:undefined;
     const surface=!target&&!creature?impactTarget(from,dir,this.solids,p.weapon==='knife'?KNIFE.range:150):undefined;let impact:ImpactMark|undefined;
-    if(surface){impact={...surface,id:++this.eventId,at:this.time,weapon:p.weapon,expiresAt:this.time+IMPACT_RULES.lifetimeMs};this.impacts.push(impact);this.impacts=this.impacts.slice(-IMPACT_RULES.limit);}
+    if(surface){impact={...surface,id:++this.eventId,at:this.time,weapon:p.weapon,expiresAt:this.time+(p.weapon==='knife'?IMPACT_RULES.knifeLifetimeMs:IMPACT_RULES.bulletLifetimeMs)};this.impacts.push(impact);this.impacts=this.impacts.slice(-IMPACT_RULES.limit);}
     this.emit(p.weapon==='knife'?'melee':'shot',p,p.weapon,from,to,{target:creature?.id??hit?.id,hitZone:creature||hit?hitZone:undefined,impact});if(creature)this.damageTrex(creature,w.damage*(hitZone==='head'?2:1),p,p.weapon,from,hitZone);else if(hit)this.damage(hit,hitZone==='head'?hit.hp:w.damage,p,p.weapon,from,hitZone);
   }
   damage(victim:Player,amount:number,attacker:{id:string;team:Team},weapon:Equipment,from:Vec3,hitZone?:HitZone,cause?:CombatEvent['cause']){
@@ -168,7 +171,7 @@ export class Simulation {
     const p=this.players.get(id);if(p){let y=0;for(const b of this.solids)if(footprint(p,b,0)&&solidTop(b,p)<=p.y+.01)y=Math.max(y,solidTop(b,p));Object.assign(bomb,{x:p.x,y,z:p.z});if(p.weapon==='bomb')p.weapon=p.primary;}
     bomb.status='dropped';bomb.carrierId=null;bomb.action=null;
   }
-  private finishBomb(winner:Team|'draw',outcome:string){this.phase='finished';this.winner=winner;this.outcome=outcome;if(winner!=='draw')this.scores[winner]=1;for(const bomb of this.bombs)bomb.action=null;}
+  private finishBomb(winner:Team|'draw',outcome:string){if(this.phase==='finished')return;this.phase='finished';this.scheduleNextGame();this.winner=winner;this.outcome=outcome;if(winner!=='draw')this.scores[winner]=1;for(const bomb of this.bombs)bomb.action=null;}
   private stepBomb(){
     // Resolve every fuse before actions, independent of team/player order. An
     // exact simultaneous detonation is a draw; a fuse wins a defuse-time tie.
@@ -179,7 +182,7 @@ export class Simulation {
         for(const p of this.players.values())if(p.hp>0&&Math.hypot(p.x-bomb.x,p.y-bomb.y,p.z-bomb.z)<18){const hp=Math.max(0,p.hp-Math.round(500*(1-Math.hypot(p.x-bomb.x,p.y-bomb.y,p.z-bomb.z)/18)));this.emit('damage',{id:`C4-${bomb.team}`,team:bomb.team},'bomb',bomb,p,{target:p.id,damage:p.hp-hp,hp});if(hp===0){p.deaths++;p.death={at:this.time,from:{x:bomb.x,y:bomb.y,z:bomb.z},vy:p.vy,crouched:p.crouched};p.respawnAt=this.time+RESPAWN_MS;}p.hp=hp;}
       }
       for(const bomb of first)for(const trex of this.trexes){const d=Math.hypot(trex.x-bomb.x,trex.y-bomb.y,trex.z-bomb.z);if(d<18)this.damageTrex(trex,Math.round(500*(1-d/18)),{id:`C4-${bomb.team}`,team:bomb.team},'bomb',bomb);}
-      this.finishBomb(first.length>1?'draw':first[0].team,first.length>1?'Both sites detonated simultaneously':`${first[0].team.toUpperCase()} C4 detonated at ${first[0].siteId}`);return;
+      this.finishBomb(first.length>1?'draw':first[0].team,first.length>1?'Both sites detonated simultaneously':`${TEAMS[first[0].team].name} C4 detonated at ${first[0].siteId}`);return;
     }
     for(const bomb of this.bombs){
       const carrier=bomb.carrierId?this.players.get(bomb.carrierId):undefined;
@@ -207,11 +210,12 @@ export class Simulation {
       const alive=(team:Team)=>[...this.players.values()].some(p=>p.team===team&&p.hp>0&&p.connected);
       const red=alive('red'),blue=alive('blue');
       if(!red&&!blue&&!this.bombs.some(b=>b.status==='planted'))this.finishBomb('draw','Both teams eliminated');
-      else if(!red&&blue&&!this.bombs.some(b=>b.team==='red'&&b.status==='planted'))this.finishBomb('blue','RED eliminated');
-      else if(!blue&&red&&!this.bombs.some(b=>b.team==='blue'&&b.status==='planted'))this.finishBomb('red','BLUE eliminated');
+      else if(!red&&blue&&!this.bombs.some(b=>b.team==='red'&&b.status==='planted'))this.finishBomb('blue','Team A eliminated');
+      else if(!blue&&red&&!this.bombs.some(b=>b.team==='blue'&&b.status==='planted'))this.finishBomb('red','Team B eliminated');
     }
   }
-  finish(){this.phase='finished';this.winner=this.scores.red===this.scores.blue?'draw':this.scores.red>this.scores.blue?'red':'blue';}
-  rematch(){if(this.phase!=='finished')return;this.wildlife.clear();this.round++;this.sprays=[];this.impacts=[];this.scores={red:0,blue:0};this.phase='playing';this.winner=null;this.endsAt=this.mode==='defusal'?0:this.time+ROUND_MS;this.roundLive=false;this.outcome='';this.bombIntents.clear();this.grenades=[];this.pickups=MAPS[this.mapId].pickups.map(p=>({...p}));for(const p of this.players.values()){p.kills=0;p.deaths=0;this.spawn(p);}if(this.mode==='defusal')this.resetBomb();}
-  snapshot():Snapshot{return{trexes:this.trexes.map(t=>({...t})),impacts:this.impacts.map(m=>({...m,position:{...m.position},normal:{...m.normal},ray:{origin:{...m.ray.origin},direction:{...m.ray.direction}}})),sprays:this.sprays.map(s=>({...s,position:{...s.position},normal:{...s.normal},ray:s.ray?{origin:{...s.ray.origin},direction:{...s.ray.direction}}:undefined})),mode:this.mode,roundLive:this.roundLive,outcome:this.outcome,bomb:this.bomb?{...this.bomb,action:this.bomb.action?{...this.bomb.action}:null}:null,bombs:this.bombs.map(b=>({...b,action:b.action?{...b.action}:null})),mapId:this.mapId,matchId:this.matchId,round:this.round,time:this.time,endsAt:this.endsAt,phase:this.phase,winner:this.winner,scores:{...this.scores},players:[...this.players.values()].map(p=>({...p,death:p.death?{...p.death,from:{...p.death.from}}:undefined,ammo:{...p.ammo}})),pickups:this.pickups.map(p=>({...p})),grenades:this.grenades.map(g=>({...g}))};}
+  private scheduleNextGame(){this.nextRoundAt=this.time+NEXT_GAME_COUNTDOWN_MS+(this.bombs.some(b=>b.status==='exploded')?BOMB_RESULT_DELAY_MS:0);}
+  finish(){if(this.phase==='finished')return;this.phase='finished';this.scheduleNextGame();this.winner=this.scores.red===this.scores.blue?'draw':this.scores.red>this.scores.blue?'red':'blue';}
+  rematch(){if(this.phase!=='finished')return;this.wildlife.clear();this.round++;this.sprays=[];this.impacts=[];this.scores={red:0,blue:0};this.phase='playing';this.nextRoundAt=0;this.winner=null;this.endsAt=this.mode==='defusal'?0:this.time+ROUND_MS;this.roundLive=false;this.outcome='';this.bombIntents.clear();this.grenades=[];this.pickups=MAPS[this.mapId].pickups.map(p=>({...p}));for(const p of this.players.values()){p.kills=0;p.deaths=0;this.spawn(p);}if(this.mode==='defusal')this.resetBomb();}
+  snapshot():Snapshot{return{trexes:this.trexes.map(t=>({...t})),impacts:this.impacts.map(m=>({...m,position:{...m.position},normal:{...m.normal},ray:{origin:{...m.ray.origin},direction:{...m.ray.direction}}})),sprays:this.sprays.map(s=>({...s,position:{...s.position},normal:{...s.normal},ray:s.ray?{origin:{...s.ray.origin},direction:{...s.ray.direction}}:undefined})),mode:this.mode,roundLive:this.roundLive,outcome:this.outcome,bomb:this.bomb?{...this.bomb,action:this.bomb.action?{...this.bomb.action}:null}:null,bombs:this.bombs.map(b=>({...b,action:b.action?{...b.action}:null})),mapId:this.mapId,matchId:this.matchId,round:this.round,time:this.time,endsAt:this.endsAt,nextRoundAt:this.nextRoundAt,phase:this.phase,winner:this.winner,scores:{...this.scores},players:[...this.players.values()].map(p=>({...p,death:p.death?{...p.death,from:{...p.death.from}}:undefined,ammo:{...p.ammo}})),pickups:this.pickups.map(p=>({...p})),grenades:this.grenades.map(g=>({...g}))};}
 }

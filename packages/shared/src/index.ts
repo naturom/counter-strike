@@ -6,6 +6,7 @@ export {SCOUT_TOWER,scoutTowerRoute} from './scout-tower';
 export {FALL_DAMAGE,fallDamage} from './fall-damage';
 export {TREX_RULES,TREX_HIT_VOLUMES,rayTrex,type Trex} from './trex';
 export type Team = 'red' | 'blue';
+export const TEAMS={red:{name:'Team A',avatar:'ironman',character:'Iron Man'},blue:{name:'Team B',avatar:'ultraman',character:'Ultraman'}} as const satisfies Record<Team,{name:string;avatar:AvatarId;character:string}>;
 export type Weapon = 'rifle' | 'pistol' | 'smg' | 'marksman';
 export type Equipment = Weapon | 'knife' | 'grenade' | 'bomb';
 export const KNIFE = {damage:40,range:1.8,interval:500} as const;
@@ -20,8 +21,9 @@ export type MapId = 'dunes' | 'relay';
 export type Vec3 = { x: number; y: number; z: number };
 export const TICK_RATE = 30, DT = 1 / TICK_RATE, SNAPSHOT_RATE = 20;
 export const ROUND_MS = 10 * 60 * 1000, WIN_SCORE = 30;
+export const NEXT_GAME_COUNTDOWN_MS=5000,BOMB_RESULT_DELAY_MS=3200;
 export const RESPAWN_MS=5000;
-export const IMPACT_RULES={limit:160,lifetimeMs:120000} as const;
+export const IMPACT_RULES={limit:160,bulletLifetimeMs:5000,knifeLifetimeMs:120000} as const;
 export const HEIGHT = 1.8, EYE = 1.6, CROUCH_HEIGHT = 1.1, CROUCH_EYE = .95, RADIUS = .34;
 export const WEAPONS = {
   rifle: { damage: 25, interval: 100, magazine: 30, reload: 1800, label: 'AR-30', automatic: true },
@@ -73,7 +75,7 @@ export interface Grenade extends Vec3 {id:number;owner:string;team:Team;vx:numbe
 export interface Spray {id:number;owner:string;position:Vec3;normal:Vec3;size?:number;ray?:{origin:Vec3;direction:Vec3};expiresAt:number;}
 export type ImpactSurface='stone'|'wood'|'metal'|'sand'|'asphalt';
 export interface ImpactMark {id:number;at:number;weapon:Weapon|'knife';position:Vec3;normal:Vec3;surface:ImpactSurface;ray:{origin:Vec3;direction:Vec3};expiresAt:number;}
-export interface Snapshot {trexes:import('./trex').Trex[];sprays:Spray[];impacts:ImpactMark[];mode:GameMode;bomb:BombState|null;bombs:BombState[];roundLive:boolean;outcome:string;mapId:MapId;matchId:string;round:number;time:number;endsAt:number;phase:'playing'|'finished';winner:Team|'draw'|null;scores:Record<Team,number>;players:Player[];pickups:Pickup[];grenades:Grenade[];}
+export interface Snapshot {trexes:import('./trex').Trex[];sprays:Spray[];impacts:ImpactMark[];mode:GameMode;bomb:BombState|null;bombs:BombState[];roundLive:boolean;outcome:string;mapId:MapId;matchId:string;round:number;time:number;endsAt:number;nextRoundAt:number;phase:'playing'|'finished';winner:Team|'draw'|null;scores:Record<Team,number>;players:Player[];pickups:Pickup[];grenades:Grenade[];}
 export type HitZone = 'head'|'body';
 export interface CombatEvent {type:'trexRoar'|'trexAttack'|'trexDeath'|'spray'|'shot'|'melee'|'kill'|'damage'|'reload'|'pickup'|'grenade'|'explosion'|'bombPlant'|'bombDefuse'|'bombAction';id:number;shooter:string;target?:string;name?:string;victim?:string;team:Team;weapon:Equipment;from:Vec3;to:Vec3;damage?:number;hp?:number;hitZone?:HitZone;cause?:'fall'|'trex';impact?:ImpactMark;}
 export function validInput(value:unknown):value is Input {
@@ -224,3 +226,4 @@ export function sprayTarget(origin:Vec3,dir:Vec3,solids:Solid[]):{position:Vec3;
  if(normal.y<-.1)return;
  return {position,normal,size:b.vehicle ? 0.55 : b.kind==='crate' ? Math.min(1.15,b.h*.8,b.w*.8,b.d*.8) : 1.15,ray:{origin:{...origin},direction:{...dir}}};
 }
+export {SurfaceCursor,SurfaceCache,type SurfaceUpdate,type SnapshotUpdate} from './surface-updates';

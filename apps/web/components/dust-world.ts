@@ -120,7 +120,7 @@ export function buildDust(art:WorldArt){
     const canopy=box(3.7,.035,1.25,color==='#a7664b'?red:teal,p.x,y+2.85,p.z+.6);canopy.rotation.x=.12;box(3.7,.16,.035,color==='#a7664b'?red:teal,p.x,y+2.78,p.z+1.22);for(const side of [-1,1]){const support=box(.028,.028,1.18,iron,p.x+side*1.65,y+2.71,p.z+.56);support.rotation.x=-.19;}
   }
   for(const b of DUST2.solids.filter(b=>b.vehicle?.part==='body'))vehicle(b);
-  // B floor and A platform markings; planes have no physical obstruction.
+  // Site markings follow the shared planting bounds on each defender's floor.
   for(const site of DUST2.bombSites??[]){
     const p=site.marker;groundMark(p.x,p.y,p.z,site.id,p.size);
   }
