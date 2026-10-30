@@ -3,10 +3,10 @@ import {RECORDED_AUDIO,RecordedAudio} from '../apps/web/components/recorded-audi
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {combatSignal,soundDuration,spatialMix,FootstepTracker,surfaceAt,type SynthSoundKind,isRecordedKind} from '../apps/web/components/combat-audio';
-import {DUST2,dustPoint,groundAt,WEAPONS,type Motion,type Solid,type Weapon} from '@sirocco/shared';
+import {DUST2,dustPoint,groundAt,WEAPONS,GUNS,type Motion,type Solid,type Weapon} from '@sirocco/shared';
 const origin={x:0,y:1.6,z:0};
 test('combat sounds have finite bounded samples, clean endpoints, distinct weapon reports and variations',()=>{
- const kinds:SynthSoundKind[]=['rifle','pistol','smg','marksman'];
+ const kinds:SynthSoundKind[]=GUNS;
  for(const kind of kinds){const a=combatSignal(12000,kind),b=combatSignal(12000,kind,1);assert.equal(a.length,Math.ceil(soundDuration(kind)*12000));assert.ok(a.every(x=>Number.isFinite(x)&&Math.abs(x)<=.821));assert.equal(Math.abs(a[0]),0);assert.equal(Math.abs(a.at(-1)!),0);assert.ok(a.some(x=>Math.abs(x)>.05));assert.notDeepEqual(a,b);}
  assert.notDeepEqual(combatSignal(12000,'rifle'),combatSignal(12000,'pistol'));
 });

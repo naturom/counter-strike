@@ -45,11 +45,12 @@ function batch(g:THREE.Group){
  for(const child of [...g.children])if(child instanceof THREE.Mesh){child.updateMatrix();const geo=(child.geometry.index?child.geometry.toNonIndexed():child.geometry.clone()).applyMatrix4(child.matrix),list=byMaterial.get(child.material as THREE.Material)??[];list.push(geo);byMaterial.set(child.material as THREE.Material,list);child.geometry.dispose();g.remove(child);}
  for(const [material,pieces] of byMaterial){const geometry=mergeGeometries(pieces);pieces.forEach(p=>p.dispose());if(geometry)g.add(new THREE.Mesh(geometry,material));}
 }
+export function batchWeaponBody(g:THREE.Group){for(const child of [...g.children])if(child instanceof THREE.Group)batchWeaponBody(child);batch(g);}
 /** One design for held guns, mirror reflections, other players and pickups. */
 export function addGunDetails(art:WorldArt,body:THREE.Group,kind:Weapon,p:WeaponFinish){
  const g=new THREE.Group();g.name='machined-weapon-details';body.add(g);
  const features:string[]=['machined-receiver','recessed-fasteners','grip-texture'];
- if(kind==='rifle'){
+ if(kind==='rifle'||kind==='m4a1s'){
   // Distinct upper/lower receiver, rear charging handle and buffer assembly.
   block(g,[.083,.034,.335],[0,.058,-.075],p.black,.009);
   block(g,[.094,.034,.040],[0,.014,.147],p.black,.004);
@@ -118,6 +119,9 @@ export function addGunDetails(art:WorldArt,body:THREE.Group,kind:Weapon,p:Weapon
   const bolt=body.getObjectByName('bolt')!;for(let i=0;i<5;i++)tube(bolt,.024,.003,[.10,.004+i*.005,.08],p.steel,'y');
   features.push('coated-optic','knurled-zoom-collar','folded-bipod','bedded-chassis');
  }
- const mag=body.getObjectByName('magazine');if(mag){const detail=new THREE.Group();detail.name='magazine-stampings';mag.add(detail);if(kind!=='pistol')for(const side of [-1,1])for(let i=0;i<4;i++){const rib=block(detail,[.003,kind==='marksman'?.075:.145,.005],[side*.035,-.010,-.038+i*.025],p.black,.001);rib.rotation.x=kind==='rifle'?-.12:0;}batch(detail);}
+ const added:Partial<Record<Weapon,string[]>>={ak47:['wood-furniture','curved-steel-magazine','gas-tube','hooded-front-sight'],m4a1s:['suppressor','short-magazine'],p90:['bullpup-stock','horizontal-magazine','visible-cartridges','raised-sight-rail'],scar:['tan-receiver','folding-stock-hinge','short-762-magazine'],m249:['belt-feed','ammo-box','hinged-feed-cover','carry-handle','bipod'],deagle:['brushed-steel-slide','fixed-barrel','heavy-muzzle','rubber-grip']};
+ if(added[kind])features.push(...added[kind]!);
+ if(kind==='scar')reflex(art,g,p,-.11);
+ const mag=body.getObjectByName('magazine');if(mag){const detail=new THREE.Group();detail.name='magazine-stampings';mag.add(detail);if(['rifle','smg','marksman','m4a1s','scar'].includes(kind))for(const side of [-1,1])for(let i=0;i<4;i++){const rib=block(detail,[.003,kind==='marksman'?.075:.145,.005],[side*.035,-.010,-.038+i*.025],p.black,.001);rib.rotation.x=kind==='rifle'?-.12:0;}batch(detail);}
  batch(g);body.userData.weaponDetails=features;
 }

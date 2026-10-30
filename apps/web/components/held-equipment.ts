@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import {mergeGeometries} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import {isGun,type Equipment,type AvatarId} from '@sirocco/shared';
+import {isGun,isSidearm,type Equipment,type AvatarId} from '@sirocco/shared';
 import type {WorldArt} from './world';
 import {realHandGeometry,anatomicalSkinTextures} from './character-anatomy';
 import {CHARACTER_STYLE} from './character-style';
@@ -170,7 +170,7 @@ function arm(m:Materials,left:boolean,at:number[],rotation:number[],open=false,t
 export function addHands(art:WorldArt,body:THREE.Group,kind:Equipment,thirdPerson=false,avatar:AvatarId='operator'){
   const m=materials(art,avatar),root=new THREE.Group();body.name='equipmentBody';root.add(body);
   let right:number[]=[.082,-.125,.055],left:number[]=[-.025,-.105,-.33],rr=[0,0,-1.2],lr=[0,0,Math.PI];
-  if(kind==='pistol'){left=[-.055,-.14,.075];lr=[.1,.15,1.15];}
+  if(isSidearm(kind)){left=[-.055,-.14,.075];lr=[.1,.15,1.15];}
   if(kind==='smg')left=[-.025,-.11,-.255];
   if(kind==='marksman')left=[-.025,-.105,-.37];
   if(kind==='knife'){right=[.075,-.025,.04];left=[-.46,-.035,-.08];lr=[-.15,-.3,.5];}
@@ -178,13 +178,13 @@ export function addHands(art:WorldArt,body:THREE.Group,kind:Equipment,thirdPerso
   if(kind==='bomb'){right=[.215,-.025,.05];left=[-.215,-.025,.05];rr=[0,-.2,-1.1];lr=[0,.2,1.1];}
   if(articulated(avatar)){
     right=[kind==='grenade'?.10:.064,kind==='knife'?0:kind==='grenade'?-.025:-.125,kind==='knife'?.045:.055];rr=[0,0,-Math.PI/2];
-    if(isGun(kind)&&kind!=='pistol'){left=[0,-.09,kind==='marksman'?-.37:kind==='smg'?-.255:-.38];lr=[0,0,Math.PI];}
-    if(kind==='pistol'){right=[.063,-.131,.075];rr=[.08,0,-1.40];left=[-.069,-.156,.037];lr=[.10,-.08,1.48];}
+    if(isGun(kind)&&!isSidearm(kind)){left=[0,-.09,kind==='marksman'?-.37:kind==='smg'||kind==='p90'?-.255:-.38];lr=[0,0,Math.PI];}
+    if(isSidearm(kind)){right=[.063,-.131,.075];rr=[.08,0,-1.40];left=[-.069,-.156,.037];lr=[.10,-.08,1.48];}
     if(kind==='knife')body.rotation.set(0,0,0);
     if(kind==='bomb'){right=[.215,-.035,.045];left=[-.130,-.125,.05];rr=[0,0,-Math.PI/2];lr=[0,0,Math.PI];}
     if(kind==='grenade'){right=[.095,.035,.035];left=[-.22,-.045,.015];rr=[0,0,-Math.PI/2];lr=[.05,-.2,1.15];}
   }
-  if(articulated(avatar)&&thirdPerson&&isGun(kind)&&kind!=='pistol')left[2]=avatar==='wonder-woman'?-.020:avatar==='ironman'&&kind==='marksman'?-.085:kind==='marksman'?-.10:-.08;
+  if(articulated(avatar)&&thirdPerson&&isGun(kind)&&!isSidearm(kind))left[2]=avatar==='wonder-woman'?-.020:avatar==='ironman'&&kind==='marksman'?-.085:kind==='marksman'?-.10:-.08;
   if(avatar==='ultraman'||avatar==='wonder-woman'){
     const width=avatar==='wonder-woman'?.84:1;
     if(kind==='knife'){right=[Math.sin(.85)*.034*width,.031*width,.040+Math.cos(.85)*.034*width];rr=[0,.85,0];left=[-.30,-.14,.16];lr=[.25,-.25,.3];}
@@ -232,11 +232,15 @@ export function animateHands(root:THREE.Group,kind:Equipment,pose:HeldPose){
       if(iron){
         const grab=THREE.MathUtils.smoothstep(p,.02,.22)*(1-THREE.MathUtils.smoothstep(p,.78,.98)),extract=THREE.MathUtils.smoothstep(p,.24,.44)*(1-THREE.MathUtils.smoothstep(p,.54,.76));
         if(!root.userData.thirdPerson){root.position.x=-.08*grab;root.position.y=.11*grab+handLift;}
-        rig.magazine.position.set(0,rig.magazine.userData.restY-(kind==='pistol'?.11:.16)*extract,rig.magazine.userData.restZ+.025*extract);
+        const top=kind==='p90';
+        rig.magazine.position.set(rig.magazine.userData.restX??0,rig.magazine.userData.restY+(top?.12:isSidearm(kind)?-.11:-.16)*extract,rig.magazine.userData.restZ+.025*extract);
         placeIronPalm(rig.left,[rig.magazine.position.x-.065,rig.magazine.position.y-.02,rig.magazine.position.z+.015],[0,0,Math.PI/2],grab);
       }
     }
   }else if(rig.magazine){rig.magazine.position.y=rig.magazine.userData.restY;rig.magazine.position.z=rig.magazine.userData.restZ;}
+  const feedCover=rig.body.getObjectByName('feed-cover'),belt=rig.body.getObjectByName('ammo-belt');
+  if(feedCover)feedCover.rotation.x=-1.2*THREE.MathUtils.smoothstep(pose.reload,.05,.22)*(1-THREE.MathUtils.smoothstep(pose.reload,.75,.94));
+  if(belt)belt.visible=pose.reload<.24||pose.reload>.7;
   if(kind==='knife'){
     const wrist=root.userData.knifeRig as {pivot:THREE.Group;origin:THREE.Vector3;rest?:THREE.Vector3}|undefined;
     if(wrist){const poseAt=knifeSwing(pose.slash??1,pose.reverseSlash),scale=pose.reduceMotion?.5:1;wrist.pivot.position.copy(wrist.origin).add(new THREE.Vector3(poseAt.x,poseAt.y,poseAt.z).multiplyScalar(scale));wrist.pivot.rotation.set((wrist.rest?.x??0)+poseAt.pitch*scale,(wrist.rest?.y??0)+poseAt.yaw*scale,(wrist.rest?.z??0)+poseAt.roll*scale);rig.left.position.set(-.18*poseAt.guard,-.26*poseAt.guard,.08*poseAt.guard);rig.left.rotation.x=-.08*poseAt.guard;}

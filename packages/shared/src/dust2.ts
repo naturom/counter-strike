@@ -194,7 +194,19 @@ export const DUST2:MapDefinition={
   id:'dunes',name:'Dust III',subtitle:'Long · Mid · Tunnels',description:'Defend the CT courtyard at A or the T terrace at B. Attack through Long, Mid and the covered tunnel routes.',solids,
   bounds:{minX:-54,maxX:54,minZ:-57,maxZ:57},
   spawns:{red:[dustPoint(380,930,3.2),dustPoint(330,930,3.2),dustPoint(430,930,3.2),dustPoint(280,930,3.2)],blue:[dustPoint(590,225),dustPoint(590,190),dustPoint(563,225),dustPoint(590,260)]},
-  pickups:[{id:'west-smg',...dustPoint(380,908,3.2),weapon:'smg',availableAt:0},{id:'east-smg',...dustPoint(590,247),weapon:'smg',availableAt:0},{id:'mid-dmr',...dustPoint(461,607,2.1*(607-438)/182),weapon:'marksman',availableAt:0},{id:'court-dmr',...dustPoint(115,453,3.2),weapon:'marksman',availableAt:0}],
+  pickups:[{id:'west-smg',...dustPoint(380,908,3.2),weapon:'smg',availableAt:0},{id:'east-smg',...dustPoint(590,247),weapon:'smg',availableAt:0},{id:'mid-dmr',...dustPoint(461,607,2.1*(607-438)/182),weapon:'marksman',availableAt:0},{id:'court-dmr',...dustPoint(115,453,3.2),weapon:'marksman',availableAt:0},
+    {id:'t-ak47',...dustPoint(405,930,3.2),weapon:'ak47',availableAt:0},
+    {id:'ct-ak47',...dustPoint(550,230),weapon:'ak47',availableAt:0},
+    {id:'t-m4a1s',...dustPoint(435,930,3.2),weapon:'m4a1s',availableAt:0},
+    {id:'ct-m4a1s',...dustPoint(580,230),weapon:'m4a1s',availableAt:0},
+    {id:'t-p90',...dustPoint(405,905,3.2),weapon:'p90',availableAt:0},
+    {id:'ct-p90',...dustPoint(550,265),weapon:'p90',availableAt:0},
+    {id:'t-scar',...dustPoint(435,905,3.2),weapon:'scar',availableAt:0},
+    {id:'ct-scar',...dustPoint(580,275),weapon:'scar',availableAt:0},
+    {id:'mid-m249',...dustPoint(520,575,1.7),weapon:'m249',availableAt:0},
+    {id:'t-deagle',...dustPoint(460,930,3.2),weapon:'deagle',availableAt:0},
+    {id:'ct-deagle',...dustPoint(610,230),weapon:'deagle',availableAt:0},
+  ],
   // Each defender starts close to its own objective: Blue defends A in the
   // clear CT courtyard; Red defends B on the T terrace. Markers and planting
   // bounds move together, with the correct height for each existing floor.

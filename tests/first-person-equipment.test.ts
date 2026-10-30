@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import * as THREE from 'three';
-import {AVATARS,type Weapon,type Equipment} from '@sirocco/shared';
+import {AVATARS,GUNS,isSidearm,type Weapon,type Equipment} from '@sirocco/shared';
 import {createAnatomicalArm} from '../apps/web/components/anatomical-arm';
 import {WorldArt,disposeGroup} from '../apps/web/components/world';
 import {animateHands} from '../apps/web/components/held-equipment';
@@ -34,10 +34,10 @@ function fixture(run:(art:WorldArt)=>void){
  try{run(art);}finally{art.destroy();globalThis.document=previous;THREE.TextureLoader.prototype.load=load;}
 }
 test('detailed first-person guns retain separate moving magazines, slides and bolts',()=>fixture(art=>{
- for(const kind of ['rifle','pistol','smg','marksman'] as Weapon[]){
+ for(const kind of GUNS){
   const model=art.weapon(kind,true,false,'ultraman'),body=model.getObjectByName('equipmentBody')!,mag=body.getObjectByName('magazine')!;
   const rest=mag.position.clone(),stamp=mag.getObjectByName('magazine-stampings');assert.ok(stamp);
-  animateHands(model,kind,{reload:.48,throwProgress:0,plant:0});assert.ok(mag.position.y<rest.y-.05,'reload must move the real magazine and its new details');
+  animateHands(model,kind,{reload:.48,throwProgress:0,plant:0});assert.ok(kind==='p90'?mag.position.y>rest.y+.05:mag.position.y<rest.y-.05,'reload must move the real magazine in its correct direction');
   assert.equal(stamp.parent,mag);animateHands(model,kind,{reload:0,throwProgress:0,plant:0});assert.ok(mag.position.distanceTo(rest)<1e-7);
   if(kind==='pistol')assert.equal(body.getObjectByName('slide-machining')?.parent,body.getObjectByName('slide'));
   if(kind==='marksman')assert.ok(body.getObjectByName('bolt'));
@@ -57,7 +57,7 @@ function weaponSignature(body:THREE.Object3D){
  }});return hash.digest('hex');
 }
 test('first-person, reflected, remote and dropped guns have identical parts and shared finishes',()=>fixture(art=>{
- for(const kind of ['rifle','pistol','smg','marksman'] as Weapon[]){
+ for(const kind of GUNS){
   const first=art.weapon(kind,true,false,'ironman'),view=first.getObjectByName('equipmentBody')!,textures=art.textures.length,materials=art.materials.length;
   const reflected=art.weapon(kind,false,true,'ironman'),mirror=reflected.getObjectByName('equipmentBody')!,pickup=art.weapon(kind,false);
   assert.equal(art.textures.length,textures,'world weapons reuse the same finish/optic textures');assert.equal(art.materials.length,materials,'world weapons reuse the same materials');
@@ -67,7 +67,7 @@ test('first-person, reflected, remote and dropped guns have identical parts and 
    for(const held of [first,reflected])animateHands(held,kind,{reload,plant:0,throwProgress:0});
    assert.equal(weaponSignature(mirror),weaponSignature(view),`${kind}: moving parts must stay consistent at reload ${reload}`);
   }
-  if(kind!=='pistol')for(const body of [view,mirror,pickup])assert.equal(body.getObjectByName('shoulder-stock')!.visible,true,'the full-length stock must be present and visible in every view');
+  if(!isSidearm(kind))for(const body of [view,mirror,pickup])assert.equal(body.getObjectByName('shoulder-stock')!.visible,true,'the full-length stock must be present and visible in every view');
   disposeGroup(first);disposeGroup(reflected);disposeGroup(pickup);
  }
 }));

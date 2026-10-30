@@ -32,6 +32,9 @@ Changes for this game: selected four footstep takes per surface, converted to
 mono 22.05 kHz PCM WAV, peak-adjusted and given short edge fades. Reload recordings were trimmed, peak-adjusted, given
 short edge fades, and edited into sequences matching the game's reload times.
 Mechanical transients retain their original speed and pitch.
+The AK-47, M4A1-S, P90, SCAR-H, M249 and Desert Eagle reload sequences
+are further edits of the same CC0 airsoft recordings, with handling segments
+spaced to match their in-game reloads. The M249 includes extra feed-tray Foley.
 No affiliation or endorsement by any contributor is implied.
 
 Knife swings: swosh-01.flac through swosh-04.flac by qubodup (Iwan Gabovitch)

@@ -36,7 +36,7 @@ export class GameAudio {
   }
   creature(kind:TrexSound,at:Vec3,occluded=false){this.play(kind,at,kind==='trex-step'?45:110,kind==='trex-step'?.7:.95,occluded);}
   spray(at?:Vec3,occluded=false){this.play('spray',at,18,.78,occluded);}
-  shot(weapon:Weapon,at?:Vec3,occluded=false){this.play(weapon,at,140,weapon==='marksman'?1.3:.95,occluded);}
+  shot(weapon:Weapon,at?:Vec3,occluded=false){this.play(weapon,at,weapon==='m4a1s'?65:140,weapon==='marksman'?1.3:weapon==='deagle'?1.15:weapon==='m4a1s'?.48:.95,occluded);}
   reload(weapon:Weapon,owner:string,at?:Vec3,occluded=false){this.play(`reload-${weapon}`,at,20,.65,occluded,owner);}
   cancelReload(owner:string){const source=this.reloads.get(owner);if(source){source.stop();this.reloads.delete(owner);}}
   syncReloads(active:Set<string>){for(const owner of this.reloads.keys())if(!active.has(owner))this.cancelReload(owner);}

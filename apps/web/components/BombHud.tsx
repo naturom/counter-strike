@@ -8,7 +8,7 @@ export function BombHud({snapshot:s,me}:{snapshot:Snapshot;me:Player}){
   if(own.status==='defused')message=`Your C4 was defused. Eliminate the enemy and defend ${defend}.`;
   if(own.status==='planted')message=`Protect your C4 at ${target} until detonation.`;
   if(enemy.status==='planted')message=`ENEMY C4 AT ${defend} · hold E near it for ${BOMB_RULES.defuseMs/1000}s to defuse.`;
-  if(me.hp<=0)message=s.roundLive?'You died · return when the next game starts.':`Solo practice · Respawning in ${Math.max(1,Math.ceil((me.respawnAt-s.time)/1000))}s.`;
+  if(me.hp<=0)message=me.death?'You died · return when the next game starts.':'Game in progress · you join the next game.';
   const armed=s.bombs.some(b=>b.status==='planted');
   return <section className={`bomb-hud ${armed?'armed':''}`} aria-label="Bomb objective" role="status">
     <strong>ATTACK {target} · DEFEND {defend}</strong><span>{message}</span>

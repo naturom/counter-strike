@@ -4,7 +4,7 @@ export type Surface='asphalt'|'stone'|'grit'|'metal'|'wood';
 export type SynthSoundKind=Weapon|TrexSound;
 export type SoundKind=SynthSoundKind|'spray'|'knife'|'knife-hit'|'knife-wall'|`reload-${Weapon}`|`step-${Surface}`;
 export const isRecordedKind=(kind:SoundKind):kind is Exclude<SoundKind,SynthSoundKind>=>kind==='spray'||kind.startsWith('step-')||kind.startsWith('reload-')||kind.startsWith('knife');
-export function soundDuration(kind:SynthSoundKind){return kind.startsWith('trex-')?trexDuration(kind as TrexSound):kind==='marksman'?1.35:.85;}
+export function soundDuration(kind:SynthSoundKind){return kind.startsWith('trex-')?trexDuration(kind as TrexSound):kind==='marksman'?1.35:kind==='deagle'?1.05:kind==='m4a1s'?.55:.85;}
 /** Layered synthesis is used for gun reports only. Knife sounds, footsteps and
  * reloads use bundled recordings and never fall back to these oscillators. */
 export function combatSignal(rate:number,kind:SynthSoundKind,variant=0){
@@ -18,9 +18,10 @@ export function combatSignal(rate:number,kind:SynthSoundKind,variant=0){
   let low=0,phase=random()*Math.PI;const alpha=1-Math.exp(-2*Math.PI*cutoff/rate),offset=Math.floor(start*rate);
   for(let j=0;j<length*rate&&offset+j<out.length;j++){const t=j/rate,n=random();low+=alpha*(n-low);phase+=2*Math.PI*resonance/rate;const envelope=(1-Math.exp(-t/attack))*Math.exp(-t/decay)*Math.min(1,(length-t)/.012);out[offset+j]+=(low*(1-toneMix)+Math.sin(phase)*toneMix)*level*envelope;}
  };
-  const profile={rifle:[.009,.085,115,.9],pistol:[.007,.055,180,.7],smg:[.005,.045,210,.6],marksman:[.018,.19,58,1.55]}[kind as Weapon];
-  layer(0,.065,2,14500,profile[0]); // muzzle crack
-  layer(.002,.28,1.5,2200,profile[1]); // gas / pressure
+  const profile={rifle:[.009,.085,115,.9],pistol:[.007,.055,180,.7],smg:[.005,.045,210,.6],marksman:[.018,.19,58,1.55],ak47:[.012,.12,87,1.3],m4a1s:[.004,.035,155,.38],p90:[.004,.035,235,.5],scar:[.014,.14,76,1.35],m249:[.012,.11,96,1.15],deagle:[.016,.17,68,1.5]}[kind as Weapon];
+  const suppressed=kind==='m4a1s';
+  layer(0,.065,suppressed?.5:2,suppressed?4300:14500,profile[0]); // muzzle crack
+  layer(.002,.28,suppressed?.55:1.5,suppressed?1500:2200,profile[1]); // gas / pressure
   layer(.004,.33,profile[3],350,profile[1],profile[2],.22); // chest of the report
   // The AWP has a deep pressure thump beneath the crack, with a short,
   // textured 52 Hz body rather than pitching down the whole gun report.

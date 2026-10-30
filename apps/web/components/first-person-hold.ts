@@ -7,6 +7,12 @@ const holds:Partial<Record<Equipment,Hold>>={
  smg:{position:[.29,-.25,-.67],pitch:0,yaw:0},
  marksman:{position:[.32,-.25,-.72],pitch:0,yaw:0},
  pistol:{position:[.23,-.23,-.67],pitch:0,yaw:0},
+ ak47:{position:[.31,-.25,-.70],pitch:0,yaw:0},
+ m4a1s:{position:[.31,-.25,-.70],pitch:0,yaw:0},
+ p90:{position:[.29,-.25,-.67],pitch:0,yaw:0},
+ scar:{position:[.31,-.25,-.70],pitch:0,yaw:0},
+ m249:{position:[.33,-.27,-.72],pitch:0,yaw:0},
+ deagle:{position:[.25,-.23,-.68],pitch:0,yaw:0},
 };
 /** Frame the full-size gun beside the camera while keeping its bore aligned
  * with the crosshair's vanishing point. Cosmetic yaw would aim the barrel away

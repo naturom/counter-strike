@@ -1,7 +1,7 @@
 import {TrexSimulation} from './trex-simulation';
+import {freshAmmo,isSidearm} from '@sirocco/shared';
 import {randomUUID} from 'node:crypto';
 import {DT,NEXT_GAME_COUNTDOWN_MS,BOMB_RESULT_DELAY_MS,TREX_RULES,rayTrex,type Trex,RESPAWN_MS,IMPACT_RULES,impactTarget,type ImpactMark,RADIUS,fallDamage,TEAMS,sprayTarget,type Spray,BOMB_RULES,plantSite,canReachBomb,footprint,solidTop,intersects,ROUND_MS,WIN_SCORE,MAPS,DEFAULT_MAP,WEAPONS,KNIFE,isGun,direction,move,neutralInput,rayBox,rayPlayer,type HitZone,wallDistance,heightOf,eyeOf,nearestPickup,type Input,type Player,type Snapshot,type CombatEvent,type Solid,type Team,type MapId,type Pickup,type Grenade,type Equipment,type Vec3,type GameMode,type BombState} from '@sirocco/shared';
-const freshAmmo=()=>({rifle:30,pistol:12,smg:0,marksman:0});
 export class Simulation {
   players=new Map<string,Player>();
   queues=new Map<string,Input[]>();
@@ -25,20 +25,20 @@ export class Simulation {
     if(this.players.size>=8)throw new Error('Room full (8/8).');
     const red=[...this.players.values()].filter(p=>p.team==='red').length,blue=this.players.size-red;
     const team:Team=red<=blue?'red':'blue';
-    const p:Player={id,name,team,avatar:TEAMS[team].avatar,x:0,y:0,z:0,vy:0,grounded:true,crouched:false,yaw:team==='red'?0:Math.PI,pitch:0,hp:100,kills:0,deaths:0,weapon:'rifle',primary:'rifle',ammo:freshAmmo(),grenades:2,reloadUntil:0,respawnAt:0,protectedUntil:0,connected:true,ack:0};
+    const p:Player={id,name,team,avatar:TEAMS[team].avatar,x:0,y:0,z:0,vy:0,grounded:true,crouched:false,yaw:team==='red'?0:Math.PI,pitch:0,hp:100,kills:0,deaths:0,weapon:'rifle',primary:'rifle',ammo:freshAmmo(),grenades:2,reloadUntil:0,respawnAt:0,protectedUntil:0,connected:true,ack:0,spawnId:0};
     this.players.set(id,p);this.queues.set(id,[]);this.spawn(p);if(this.mode==='defusal'&&this.roundLive){p.hp=0;p.respawnAt=0;}return p;
   }
   remove(id:string){this.falls.delete(id);this.dropBomb(id);this.bombIntents.delete(id);this.players.delete(id);this.queues.delete(id);this.lastSeq.delete(id);this.nextShot.delete(id);this.trigger.delete(id);this.actions.delete(id);}
-  input(id:string,i:Input){const prev=this.lastSeq.get(id)??0;if(i.seq<=prev||i.seq-prev>120)return;this.lastSeq.set(id,i.seq);const q=this.queues.get(id);if(!q)return;if(q.length>=8)q.shift();q.push(i);}
+  input(id:string,i:Input){const prev=this.lastSeq.get(id)??0;if(i.seq<=prev||i.seq-prev>120)return;this.lastSeq.set(id,i.seq);const p=this.players.get(id);if(!p)return;if(p.hp<=0||this.phase!=='playing'||i.spawnId!==undefined&&i.spawnId!==p.spawnId){p.ack=Math.max(p.ack,i.seq);return;}const q=this.queues.get(id);if(!q)return;if(q.length>=8)q.shift();q.push(i);}
   spawn(p:Player){
-    p.avatar=TEAMS[p.team].avatar;
+    p.avatar=TEAMS[p.team].avatar;p.spawnId++;p.ack=Math.max(p.ack,this.lastSeq.get(p.id)??0);
     this.falls.delete(p.id);
     const others=[...this.players.values()].filter(o=>o.id!==p.id&&o.hp>0);
     const spots=MAPS[this.mapId].spawns[p.team].map(s=>({s,safety:Math.min(...others.map(o=>Math.hypot(o.x-s.x,o.z-s.z)),100)}));spots.sort((a,b)=>b.safety-a.safety);
-    Object.assign(p,spots[0].s,{hp:100,vy:0,grounded:true,crouched:false,ammo:freshAmmo(),weapon:'rifle',primary:'rifle',grenades:2,reloadUntil:0,respawnAt:0,death:undefined,protectedUntil:this.time+1500,yaw:p.team==='red'?0:Math.PI,pitch:0});
+    Object.assign(p,spots[0].s,{hp:100,vy:0,grounded:true,crouched:false,ammo:freshAmmo(),weapon:'rifle',primary:'rifle',secondary:'pistol',grenades:2,reloadUntil:0,respawnAt:0,death:undefined,protectedUntil:this.time+1500,yaw:p.team==='red'?0:Math.PI,pitch:0});
     this.queues.set(p.id,[]);this.trigger.delete(p.id);this.actions.set(p.id,{interact:false,throwAt:0});this.nextShot.set(p.id,this.time+100);
-    // Solo practice respawns reuse the round. Return only a dropped team charge;
-    // a planted C4 or one already carried by a teammate must remain untouched.
+    // Assign an unclaimed charge before play starts. Full game resets rebuild
+    // both charges after everyone has spawned.
     if(this.mode==='defusal'&&!this.roundLive&&p.connected){const bomb=this.bombs.find(b=>b.team===p.team);if(bomb?.status==='dropped'&&!bomb.carrierId)Object.assign(bomb,{x:p.x,y:p.y,z:p.z,status:'carried',carrierId:p.id,siteId:null,explodeAt:0,action:null});}
   }
   step(){
@@ -47,7 +47,7 @@ export class Simulation {
     if(this.mode==='deathmatch'&&this.time>=this.endsAt){this.finish();return;}
     for(const p of this.players.values()){
       if(this.winner!==null)break;
-      if(p.hp<=0){if((this.mode==='deathmatch'||!this.roundLive)&&this.time>=p.respawnAt)this.spawn(p);continue;}
+      if(p.hp<=0){if(this.mode==='deathmatch'&&this.time>=p.respawnAt)this.spawn(p);continue;}
       if(isGun(p.weapon)&&p.reloadUntil&&this.time>=p.reloadUntil){p.ammo[p.weapon]=WEAPONS[p.weapon].magazine;p.reloadUntil=0;}
       const i=this.queues.get(p.id)?.shift();
       const controls=i&&p.connected?i:{...neutralInput(),yaw:p.yaw,pitch:p.pitch,weapon:p.weapon,crouch:p.crouched};
@@ -69,7 +69,7 @@ export class Simulation {
         if(target){this.sprays.push({id:++this.eventId,owner:p.id,...target,expiresAt:this.time+120000});this.sprays=this.sprays.slice(-24);this.emit('spray',p,p.weapon,this.eye(p),target.position);}
       }
       const ownBomb=this.bombs.find(b=>b.team===p.team),enemyBomb=this.bombs.find(b=>b.team!==p.team);
-      if(i.weapon!==p.weapon&&(i.weapon===p.primary||i.weapon==='pistol'||i.weapon==='knife'||i.weapon==='grenade'||i.weapon==='bomb'&&ownBomb?.carrierId===p.id&&ownBomb.status==='carried')){p.weapon=i.weapon;p.reloadUntil=0;this.nextShot.set(p.id,Math.max(this.nextShot.get(p.id)??0,this.time+(isGun(p.weapon)?200:0)));}
+      if(i.weapon!==p.weapon&&(i.weapon===p.primary||i.weapon===(p.secondary??'pistol')||i.weapon==='knife'||i.weapon==='grenade'||i.weapon==='bomb'&&ownBomb?.carrierId===p.id&&ownBomb.status==='carried')){p.weapon=i.weapon;p.reloadUntil=0;this.nextShot.set(p.id,Math.max(this.nextShot.get(p.id)??0,this.time+(isGun(p.weapon)?200:0)));}
       const action=this.actions.get(p.id)!;
       if(i.interact&&!action.interact){if(ownBomb?.status==='dropped'&&canReachBomb(p,ownBomb,this.solids)){ownBomb.status='carried';ownBomb.carrierId=p.id;this.emit('pickup',p,'bomb',p,p);}else if(!(enemyBomb?.status==='planted'&&canReachBomb(p,enemyBomb,this.solids)))this.pickup(p);}
       action.interact=!!i.interact;
@@ -81,8 +81,8 @@ export class Simulation {
         if(i.fire&&!was&&this.time+.01>=(this.nextShot.get(p.id)??0))this.fire(p);
       }else{
         const w=WEAPONS[p.weapon];
-        if(i.reload&&!p.reloadUntil&&p.ammo[p.weapon]<w.magazine){p.reloadUntil=this.time+w.reload;this.emit('reload',p,p.weapon,this.eye(p),this.eye(p));}
-        if(i.fire&&(!i.sprint||p.crouched)&&!p.reloadUntil&&p.ammo[p.weapon]>0&&(w.automatic||!was)&&this.time+.01>=(this.nextShot.get(p.id)??0))this.fire(p);
+        if(i.reload&&!p.reloadUntil&&(p.ammo[p.weapon]??0)<w.magazine){p.reloadUntil=this.time+w.reload;this.emit('reload',p,p.weapon,this.eye(p),this.eye(p));}
+        if(i.fire&&(!i.sprint||p.crouched)&&!p.reloadUntil&&(p.ammo[p.weapon]??0)>0&&(w.automatic||!was)&&this.time+.01>=(this.nextShot.get(p.id)??0))this.fire(p);
       }
       this.trigger.set(p.id,i.fire);
     }
@@ -94,13 +94,15 @@ export class Simulation {
   private emit(type:CombatEvent['type'],p:{id:string;team:Team},weapon:Equipment,from:Vec3,to:Vec3,extra:Partial<CombatEvent>={}){this.events.push({type,id:++this.eventId,shooter:p.id,team:p.team,weapon,from:{...from},to:{...to},...extra});}
   pickup(p:Player){
     const pickup=nearestPickup(p,this.pickups,this.time,this.solids);if(!pickup)return;
-    if(p.primary!=='rifle')p.ammo[p.primary]=0;
-    p.primary=pickup.weapon;p.weapon=pickup.weapon;p.ammo[p.weapon]=WEAPONS[p.weapon].magazine;p.reloadUntil=0;
+    const previous=isSidearm(pickup.weapon)?p.secondary??'pistol':p.primary;
+    if(Object.hasOwn(freshAmmo(),previous))p.ammo[previous]=0;else delete p.ammo[previous];
+    if(isSidearm(pickup.weapon))p.secondary=pickup.weapon;else p.primary=pickup.weapon;
+    p.weapon=pickup.weapon;p.ammo[p.weapon]=WEAPONS[p.weapon].magazine;p.reloadUntil=0;
     pickup.availableAt=this.time+20000;this.nextShot.set(p.id,this.time+300);
     this.emit('pickup',p,p.weapon,p,p,{target:p.id});
   }
   fire(p:Player){
-    if(p.weapon==='grenade'||p.weapon==='bomb')return;const w=p.weapon==='knife'?KNIFE:WEAPONS[p.weapon];if(isGun(p.weapon))p.ammo[p.weapon]--;this.nextShot.set(p.id,this.time+w.interval);p.protectedUntil=0;
+    if(p.weapon==='grenade'||p.weapon==='bomb')return;const w=p.weapon==='knife'?KNIFE:WEAPONS[p.weapon];if(isGun(p.weapon))p.ammo[p.weapon]=Math.max(0,(p.ammo[p.weapon]??0)-1);this.nextShot.set(p.id,this.time+w.interval);p.protectedUntil=0;
     const from=this.eye(p),dir=direction(p.yaw,p.pitch);let distance=Math.min(p.weapon==='knife'?KNIFE.range:150,wallDistance(from,dir,this.solids)),target:Player|undefined,creature:Trex|undefined,hitZone:HitZone|undefined;
     for(const other of this.players.values()){
       if(other.id===p.id||other.hp<=0)continue;
@@ -206,6 +208,8 @@ export class Simulation {
       }
     }
     if(this.bombs.every(b=>b.status==='defused')){this.finishBomb('draw','Both C4 charges defused');return;}
+    const connected=[...this.players.values()].filter(p=>p.connected);
+    if(connected.length===1&&connected[0].hp<=0&&connected[0].death){this.finishBomb('draw','Solo player died');return;}
     if(this.roundLive){
       const alive=(team:Team)=>[...this.players.values()].some(p=>p.team===team&&p.hp>0&&p.connected);
       const red=alive('red'),blue=alive('blue');

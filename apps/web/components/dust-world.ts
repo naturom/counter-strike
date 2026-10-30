@@ -111,13 +111,13 @@ export function buildDust(art:WorldArt){
   // A framed roof light: short joists seat on headers at the actual slab edges.
   tunnelRoofFrame(art,root,DUST2.solids,gateWood,art.stone);
   for(let v=343;v<414;v+=20){const p=dustPoint(118,v);box(4.5,.18,.14,art.wood,p.x,6.55,p.z);}
-  // Street-front shutters, awnings and signs around Long and Top Mid.
-  for(const [u,v,text,color] of [[758,583,'SALON DE COIFFURE','#517a76'],[789,690,'TÉLÉBOUTIQUE','#4a7181'],[553,626,'MARCHÉ DU SOLEIL','#a7664b']] as const){
+  // Street-front shutters, awnings and signs along Long.
+  for(const [u,v,text,color] of [[758,583,'SALON DE COIFFURE','#517a76'],[789,690,'TÉLÉBOUTIQUE','#4a7181']] as const){
     const p=dustPoint(u,v);const y=v>800?3.2:v>580?2.1:0;
     box(2.8,2.7,.08,iron,p.x,y+1.35,p.z+.07);
     for(let k=0;k<18;k++)box(2.75,.035,.04,art.trim,p.x,y+.12+k*.145,p.z+.13);
     art.sign(root,text,p.x,y+3.15,p.z+.16,0,color,3.6);
-    const canopy=box(3.7,.035,1.25,color==='#a7664b'?red:teal,p.x,y+2.85,p.z+.6);canopy.rotation.x=.12;box(3.7,.16,.035,color==='#a7664b'?red:teal,p.x,y+2.78,p.z+1.22);for(const side of [-1,1]){const support=box(.028,.028,1.18,iron,p.x+side*1.65,y+2.71,p.z+.56);support.rotation.x=-.19;}
+    const canopy=box(3.7,.035,1.25,teal,p.x,y+2.85,p.z+.6);canopy.rotation.x=.12;box(3.7,.16,.035,teal,p.x,y+2.78,p.z+1.22);for(const side of [-1,1]){const support=box(.028,.028,1.18,iron,p.x+side*1.65,y+2.71,p.z+.56);support.rotation.x=-.19;}
   }
   for(const b of DUST2.solids.filter(b=>b.vehicle?.part==='body'))vehicle(b);
   // Site markings follow the shared planting bounds on each defender's floor.

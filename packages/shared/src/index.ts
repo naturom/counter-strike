@@ -7,10 +7,12 @@ export {FALL_DAMAGE,fallDamage} from './fall-damage';
 export {TREX_RULES,TREX_HIT_VOLUMES,rayTrex,type Trex} from './trex';
 export type Team = 'red' | 'blue';
 export const TEAMS={red:{name:'Team A',avatar:'ironman',character:'Iron Man'},blue:{name:'Team B',avatar:'ultraman',character:'Ultraman'}} as const satisfies Record<Team,{name:string;avatar:AvatarId;character:string}>;
-export type Weapon = 'rifle' | 'pistol' | 'smg' | 'marksman';
+export type Weapon = 'rifle' | 'pistol' | 'smg' | 'marksman' | 'ak47' | 'm4a1s' | 'p90' | 'scar' | 'm249' | 'deagle';
+export type Sidearm = 'pistol'|'deagle';
 export type Equipment = Weapon | 'knife' | 'grenade' | 'bomb';
 export const KNIFE = {damage:40,range:1.8,interval:500} as const;
 export const isGun = (weapon:Equipment):weapon is Weapon => weapon!=='knife'&&weapon!=='grenade'&&weapon!=='bomb';
+export const isSidearm=(weapon:Equipment):weapon is Sidearm=>weapon==='pistol'||weapon==='deagle';
 export type GameMode='deathmatch'|'defusal';
 export const validMode=(value:unknown):value is GameMode=>value==='deathmatch'||value==='defusal';
 export const BOMB_RULES={plantMs:3200,fuseMs:40000,defuseMs:10000,range:2.2} as const;
@@ -30,7 +32,17 @@ export const WEAPONS = {
   pistol: { damage: 20, interval: 200, magazine: 12, reload: 1200, label: 'P-12', automatic: false },
   smg: { damage: 17, interval: 1000 / 900, magazine: 40, reload: 1500, label: 'V-40 SMG', automatic: true },
   marksman: { damage: 70, interval: 650, magazine: 8, reload: 2400, label: 'AWP-8', automatic: false },
+  ak47: { damage: 36, interval: 100, magazine: 30, reload: 2200, label: 'AK-47', automatic: true },
+  m4a1s: { damage: 24, interval: 90, magazine: 20, reload: 2200, label: 'M4A1-S', automatic: true },
+  p90: { damage: 15, interval: 60, magazine: 50, reload: 2400, label: 'P90', automatic: true },
+  scar: { damage: 42, interval: 160, magazine: 20, reload: 2300, label: 'SCAR-H', automatic: true },
+  m249: { damage: 23, interval: 85, magazine: 100, reload: 4600, label: 'M249', automatic: true },
+  deagle: { damage: 55, interval: 300, magazine: 7, reload: 1800, label: 'DESERT EAGLE', automatic: false },
 } as const;
+export const GUNS=Object.keys(WEAPONS) as Weapon[];
+export type Ammo=Record<'rifle'|'pistol'|'smg'|'marksman',number>&Partial<Record<Weapon,number>>;
+export const freshAmmo=():Ammo=>({rifle:30,pistol:12,smg:0,marksman:0});
+export const gunRecoil=(weapon:Weapon)=>({rifle:.035,pistol:.028,smg:.025,marksman:.065,ak47:.055,m4a1s:.025,p90:.018,scar:.060,m249:.047,deagle:.080})[weapon];
 export const weaponLabel = (weapon: Equipment) => weapon === 'bomb' ? 'C4' : weapon === 'knife' ? 'KNIFE' : weapon === 'grenade' ? 'FRAG' : WEAPONS[weapon].label;
 export type Solid = { x: number; y: number; z: number; w: number; h: number; d: number; kind: 'wall' | 'crate' | 'roof' | 'floor'; polygon?: [number,number][]; ramp?: {axis:'x'|'z';from:number;to:number}; style?: 'plaster'|'kasbah'|'stone'|'road'|'tile'|'door'|'metal'; label?:string;vehicle?:{part:'body'|'cabin'|'cargo';height:number;truck:boolean} };
 const block = (x: number, z: number, w: number, d: number, h = 5, kind: Solid['kind'] = 'wall', y = h / 2): Solid => ({ x, y, z, w, h, d, kind });
@@ -58,6 +70,13 @@ const supplies:Pickup[]=[
   {id:'east-smg',x:25,y:0,z:-16,weapon:'smg',availableAt:0},
   {id:'mid-dmr',x:0,y:0,z:-10,weapon:'marksman',availableAt:0},
   {id:'court-dmr',x:0,y:0,z:12,weapon:'marksman',availableAt:0},
+  {id:'west-ak47',x:-21,y:0,z:17,weapon:'ak47',availableAt:0},
+  {id:'east-m4a1s',x:21,y:0,z:-17,weapon:'m4a1s',availableAt:0},
+  {id:'west-p90',x:-26,y:0,z:12,weapon:'p90',availableAt:0},
+  {id:'east-scar',x:26,y:0,z:-12,weapon:'scar',availableAt:0},
+  {id:'mid-m249',x:0,y:0,z:2,weapon:'m249',availableAt:0},
+  {id:'west-deagle',x:-20,y:0,z:21,weapon:'deagle',availableAt:0},
+  {id:'east-deagle',x:20,y:0,z:-21,weapon:'deagle',availableAt:0},
 ];
 export const MAPS:Record<MapId,MapDefinition>={
   dunes:DUST2,
@@ -66,11 +85,11 @@ export const MAPS:Record<MapId,MapDefinition>={
 export const DEFAULT_MAP:MapId='dunes';
 export const validMap = (value:unknown):value is MapId => value==='dunes'||value==='relay';
 export const SOLIDS=MAPS[DEFAULT_MAP].solids, SPAWNS=MAPS[DEFAULT_MAP].spawns;
-export interface Input {seq:number;forward:number;strafe:number;yaw:number;pitch:number;jump:boolean;sprint:boolean;fire:boolean;reload:boolean;weapon:Equipment;crouch:boolean;interact:boolean;spray?:boolean;summon?:boolean;}
+export interface Input {seq:number;spawnId?:number;forward:number;strafe:number;yaw:number;pitch:number;jump:boolean;sprint:boolean;fire:boolean;reload:boolean;weapon:Equipment;crouch:boolean;interact:boolean;spray?:boolean;summon?:boolean;}
 export const neutralInput=():Input=>({seq:0,forward:0,strafe:0,yaw:0,pitch:0,jump:false,sprint:false,fire:false,reload:false,weapon:'rifle',crouch:false,interact:false});
 export interface Motion extends Vec3 {vy:number;grounded:boolean;crouched?:boolean;}
 export interface DeathState {at:number;from:Vec3;vy:number;crouched:boolean;}
-export interface Player extends Motion {avatar:AvatarId;id:string;name:string;team:Team;yaw:number;pitch:number;hp:number;kills:number;deaths:number;weapon:Equipment;primary:Weapon;ammo:Record<Weapon,number>;grenades:number;crouched:boolean;reloadUntil:number;respawnAt:number;protectedUntil:number;connected:boolean;ack:number;death?:DeathState;}
+export interface Player extends Motion {avatar:AvatarId;id:string;name:string;team:Team;yaw:number;pitch:number;hp:number;kills:number;deaths:number;weapon:Equipment;primary:Weapon;secondary?:Sidearm;ammo:Ammo;grenades:number;crouched:boolean;reloadUntil:number;respawnAt:number;protectedUntil:number;connected:boolean;ack:number;spawnId:number;death?:DeathState;}
 export interface Grenade extends Vec3 {id:number;owner:string;team:Team;vx:number;vy:number;vz:number;explodeAt:number;}
 export interface Spray {id:number;owner:string;position:Vec3;normal:Vec3;size?:number;ray?:{origin:Vec3;direction:Vec3};expiresAt:number;}
 export type ImpactSurface='stone'|'wood'|'metal'|'sand'|'asphalt';
@@ -80,7 +99,7 @@ export type HitZone = 'head'|'body';
 export interface CombatEvent {type:'trexRoar'|'trexAttack'|'trexDeath'|'spray'|'shot'|'melee'|'kill'|'damage'|'reload'|'pickup'|'grenade'|'explosion'|'bombPlant'|'bombDefuse'|'bombAction';id:number;shooter:string;target?:string;name?:string;victim?:string;team:Team;weapon:Equipment;from:Vec3;to:Vec3;damage?:number;hp?:number;hitZone?:HitZone;cause?:'fall'|'trex';impact?:ImpactMark;}
 export function validInput(value:unknown):value is Input {
   if(!value||typeof value!=='object')return false;const i=value as Input;
-  return Number.isSafeInteger(i.seq)&&i.seq>=0&&i.seq<2**31&&Number.isFinite(i.forward)&&Math.abs(i.forward)<=1&&Number.isFinite(i.strafe)&&Math.abs(i.strafe)<=1&&Number.isFinite(i.yaw)&&Math.abs(i.yaw)<=Math.PI*2&&Number.isFinite(i.pitch)&&Math.abs(i.pitch)<=1.5&&
+  return (i.spawnId===undefined||Number.isSafeInteger(i.spawnId)&&i.spawnId>0)&&Number.isSafeInteger(i.seq)&&i.seq>=0&&i.seq<2**31&&Number.isFinite(i.forward)&&Math.abs(i.forward)<=1&&Number.isFinite(i.strafe)&&Math.abs(i.strafe)<=1&&Number.isFinite(i.yaw)&&Math.abs(i.yaw)<=Math.PI*2&&Number.isFinite(i.pitch)&&Math.abs(i.pitch)<=1.5&&
     ['jump','sprint','fire','reload'].every(k=>typeof (i as any)[k]==='boolean')&&
     ['crouch','interact','spray','summon'].every(k=>(i as any)[k]===undefined||typeof (i as any)[k]==='boolean')&&(i.weapon==='knife'||i.weapon==='grenade'||i.weapon==='bomb'||Object.hasOwn(WEAPONS,i.weapon));
 }

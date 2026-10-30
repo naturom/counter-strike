@@ -54,7 +54,7 @@ test('a scoped AWP shot anchors to its barrel as the weapon becomes visible agai
  const arena=Object.create(Arena.prototype) as Arena,camera=new THREE.PerspectiveCamera(12,16/9,.06,350),view=new THREE.PerspectiveCamera(65,16/9,.025,8),gun=new THREE.Group(),model=new THREE.Group(),muzzle=new THREE.Object3D(),scene=new THREE.Scene();
  muzzle.name='muzzle';muzzle.position.set(0,.035,-1.149);model.position.y=.06;model.add(muzzle);gun.add(model);gun.position.set(.32,-.25,-.72);gun.scale.setScalar(.75);gun.visible=false;
  const traces:{object:THREE.Line;localWeapon?:Weapon}[]=[];
- Object.assign(arena,{id:'local',gunKind:'marksman',gun,gunModels:new Map([['marksman',model]]),camera,viewCamera:view,scene,traces,scope:new SniperScope(),shownScope:1,callbacks:{scope:()=>{}},audio:{shot:()=>{}}});
+ Object.assign(arena,{id:'local',gunKind:'marksman',flash:new THREE.Group(),gun,gunModels:new Map([['marksman',model]]),camera,viewCamera:view,scene,traces,scope:new SniperScope(),shownScope:1,callbacks:{scope:()=>{}},audio:{shot:()=>{}}});
  arena.combat({id:1,type:'shot',shooter:'local',team:'red',weapon:'marksman',from:{x:0,y:0,z:0},to:{x:0,y:0,z:-50}});
  assert.equal(camera.fov,BASE_FOV);assert.equal(traces[0].localWeapon,'marksman','the hidden scope view must not force a shot from the player eye');
  const origin=new THREE.Vector3().fromBufferAttribute(traces[0].object.geometry.attributes.position,0),screen=origin.project(camera),expected=muzzle.getWorldPosition(new THREE.Vector3()).project(view);
