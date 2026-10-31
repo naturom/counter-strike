@@ -85,11 +85,11 @@ export const MAPS:Record<MapId,MapDefinition>={
 export const DEFAULT_MAP:MapId='dunes';
 export const validMap = (value:unknown):value is MapId => value==='dunes'||value==='relay';
 export const SOLIDS=MAPS[DEFAULT_MAP].solids, SPAWNS=MAPS[DEFAULT_MAP].spawns;
-export interface Input {seq:number;spawnId?:number;forward:number;strafe:number;yaw:number;pitch:number;jump:boolean;sprint:boolean;fire:boolean;reload:boolean;weapon:Equipment;crouch:boolean;interact:boolean;spray?:boolean;summon?:boolean;}
+export interface Input {seq:number;spawnId?:number;scope?:0|1|2;forward:number;strafe:number;yaw:number;pitch:number;jump:boolean;sprint:boolean;fire:boolean;reload:boolean;weapon:Equipment;crouch:boolean;interact:boolean;spray?:boolean;summon?:boolean;}
 export const neutralInput=():Input=>({seq:0,forward:0,strafe:0,yaw:0,pitch:0,jump:false,sprint:false,fire:false,reload:false,weapon:'rifle',crouch:false,interact:false});
 export interface Motion extends Vec3 {vy:number;grounded:boolean;crouched?:boolean;}
 export interface DeathState {at:number;from:Vec3;vy:number;crouched:boolean;}
-export interface Player extends Motion {avatar:AvatarId;id:string;name:string;team:Team;yaw:number;pitch:number;hp:number;kills:number;deaths:number;weapon:Equipment;primary:Weapon;secondary?:Sidearm;ammo:Ammo;grenades:number;crouched:boolean;reloadUntil:number;respawnAt:number;protectedUntil:number;connected:boolean;ack:number;spawnId:number;death?:DeathState;}
+export interface Player extends Motion {avatar:AvatarId;id:string;name:string;team:Team;yaw:number;pitch:number;scope?:0|1|2;hp:number;kills:number;deaths:number;weapon:Equipment;primary:Weapon;secondary?:Sidearm;ammo:Ammo;grenades:number;crouched:boolean;reloadUntil:number;respawnAt:number;protectedUntil:number;connected:boolean;ack:number;spawnId:number;death?:DeathState;}
 export interface Grenade extends Vec3 {id:number;owner:string;team:Team;vx:number;vy:number;vz:number;explodeAt:number;}
 export interface Spray {id:number;owner:string;position:Vec3;normal:Vec3;size?:number;ray?:{origin:Vec3;direction:Vec3};expiresAt:number;}
 export type ImpactSurface='stone'|'wood'|'metal'|'sand'|'asphalt';
@@ -99,7 +99,7 @@ export type HitZone = 'head'|'body';
 export interface CombatEvent {type:'trexRoar'|'trexAttack'|'trexDeath'|'spray'|'shot'|'melee'|'kill'|'damage'|'reload'|'pickup'|'grenade'|'explosion'|'bombPlant'|'bombDefuse'|'bombAction';id:number;shooter:string;target?:string;name?:string;victim?:string;team:Team;weapon:Equipment;from:Vec3;to:Vec3;damage?:number;hp?:number;hitZone?:HitZone;cause?:'fall'|'trex';impact?:ImpactMark;}
 export function validInput(value:unknown):value is Input {
   if(!value||typeof value!=='object')return false;const i=value as Input;
-  return (i.spawnId===undefined||Number.isSafeInteger(i.spawnId)&&i.spawnId>0)&&Number.isSafeInteger(i.seq)&&i.seq>=0&&i.seq<2**31&&Number.isFinite(i.forward)&&Math.abs(i.forward)<=1&&Number.isFinite(i.strafe)&&Math.abs(i.strafe)<=1&&Number.isFinite(i.yaw)&&Math.abs(i.yaw)<=Math.PI*2&&Number.isFinite(i.pitch)&&Math.abs(i.pitch)<=1.5&&
+  return (i.scope===undefined||i.scope===0||i.scope===1||i.scope===2)&&(i.spawnId===undefined||Number.isSafeInteger(i.spawnId)&&i.spawnId>0)&&Number.isSafeInteger(i.seq)&&i.seq>=0&&i.seq<2**31&&Number.isFinite(i.forward)&&Math.abs(i.forward)<=1&&Number.isFinite(i.strafe)&&Math.abs(i.strafe)<=1&&Number.isFinite(i.yaw)&&Math.abs(i.yaw)<=Math.PI*2&&Number.isFinite(i.pitch)&&Math.abs(i.pitch)<=1.5&&
     ['jump','sprint','fire','reload'].every(k=>typeof (i as any)[k]==='boolean')&&
     ['crouch','interact','spray','summon'].every(k=>(i as any)[k]===undefined||typeof (i as any)[k]==='boolean')&&(i.weapon==='knife'||i.weapon==='grenade'||i.weapon==='bomb'||Object.hasOwn(WEAPONS,i.weapon));
 }

@@ -26,7 +26,9 @@ export class ArenaRoom extends Room {
       this.sim.step();
       for(const event of this.sim.events)this.broadcast('combat',event);
       // Close abandoned tabs after two minutes without meaningful control input.
-      for(const client of this.clients)if(Date.now()-(this.idle.get(client.sessionId)??Date.now())>120000)client.leave(4000,'Inactive for two minutes');
+      for(const client of this.clients){const player=this.sim.players.get(client.sessionId),watching=this.sim.mode==='defusal'&&this.sim.phase==='playing'&&player?.hp===0;
+        if(watching)this.idle.set(client.sessionId,Date.now());
+        else if(Date.now()-(this.idle.get(client.sessionId)??Date.now())>120000)client.leave(4000,'Inactive for two minutes');}
     },1000/30);
     this.clock.setInterval(()=>{
       const state=this.sim.snapshot(),{impacts,sprays,...motion}=state;

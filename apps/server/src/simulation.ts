@@ -35,7 +35,7 @@ export class Simulation {
     this.falls.delete(p.id);
     const others=[...this.players.values()].filter(o=>o.id!==p.id&&o.hp>0);
     const spots=MAPS[this.mapId].spawns[p.team].map(s=>({s,safety:Math.min(...others.map(o=>Math.hypot(o.x-s.x,o.z-s.z)),100)}));spots.sort((a,b)=>b.safety-a.safety);
-    Object.assign(p,spots[0].s,{hp:100,vy:0,grounded:true,crouched:false,ammo:freshAmmo(),weapon:'rifle',primary:'rifle',secondary:'pistol',grenades:2,reloadUntil:0,respawnAt:0,death:undefined,protectedUntil:this.time+1500,yaw:p.team==='red'?0:Math.PI,pitch:0});
+    Object.assign(p,spots[0].s,{hp:100,vy:0,grounded:true,crouched:false,ammo:freshAmmo(),weapon:'rifle',primary:'rifle',secondary:'pistol',scope:undefined,grenades:2,reloadUntil:0,respawnAt:0,death:undefined,protectedUntil:this.time+1500,yaw:p.team==='red'?0:Math.PI,pitch:0});
     this.queues.set(p.id,[]);this.trigger.delete(p.id);this.actions.set(p.id,{interact:false,throwAt:0});this.nextShot.set(p.id,this.time+100);
     // Assign an unclaimed charge before play starts. Full game resets rebuild
     // both charges after everyone has spawned.
@@ -70,6 +70,7 @@ export class Simulation {
       }
       const ownBomb=this.bombs.find(b=>b.team===p.team),enemyBomb=this.bombs.find(b=>b.team!==p.team);
       if(i.weapon!==p.weapon&&(i.weapon===p.primary||i.weapon===(p.secondary??'pistol')||i.weapon==='knife'||i.weapon==='grenade'||i.weapon==='bomb'&&ownBomb?.carrierId===p.id&&ownBomb.status==='carried')){p.weapon=i.weapon;p.reloadUntil=0;this.nextShot.set(p.id,Math.max(this.nextShot.get(p.id)??0,this.time+(isGun(p.weapon)?200:0)));}
+      p.scope=p.weapon==='marksman'&&!p.reloadUntil&&!i.sprint&&(i.scope===1||i.scope===2)?i.scope:undefined;
       const action=this.actions.get(p.id)!;
       if(i.interact&&!action.interact){if(ownBomb?.status==='dropped'&&canReachBomb(p,ownBomb,this.solids)){ownBomb.status='carried';ownBomb.carrierId=p.id;this.emit('pickup',p,'bomb',p,p);}else if(!(enemyBomb?.status==='planted'&&canReachBomb(p,enemyBomb,this.solids)))this.pickup(p);}
       action.interact=!!i.interact;
@@ -81,7 +82,7 @@ export class Simulation {
         if(i.fire&&!was&&this.time+.01>=(this.nextShot.get(p.id)??0))this.fire(p);
       }else{
         const w=WEAPONS[p.weapon];
-        if(i.reload&&!p.reloadUntil&&(p.ammo[p.weapon]??0)<w.magazine){p.reloadUntil=this.time+w.reload;this.emit('reload',p,p.weapon,this.eye(p),this.eye(p));}
+        if(i.reload&&!p.reloadUntil&&(p.ammo[p.weapon]??0)<w.magazine){p.reloadUntil=this.time+w.reload;p.scope=undefined;this.emit('reload',p,p.weapon,this.eye(p),this.eye(p));}
         if(i.fire&&(!i.sprint||p.crouched)&&!p.reloadUntil&&(p.ammo[p.weapon]??0)>0&&(w.automatic||!was)&&this.time+.01>=(this.nextShot.get(p.id)??0))this.fire(p);
       }
       this.trigger.set(p.id,i.fire);
@@ -97,12 +98,12 @@ export class Simulation {
     const previous=isSidearm(pickup.weapon)?p.secondary??'pistol':p.primary;
     if(Object.hasOwn(freshAmmo(),previous))p.ammo[previous]=0;else delete p.ammo[previous];
     if(isSidearm(pickup.weapon))p.secondary=pickup.weapon;else p.primary=pickup.weapon;
-    p.weapon=pickup.weapon;p.ammo[p.weapon]=WEAPONS[p.weapon].magazine;p.reloadUntil=0;
+    p.weapon=pickup.weapon;p.ammo[p.weapon]=WEAPONS[p.weapon].magazine;p.reloadUntil=0;p.scope=undefined;
     pickup.availableAt=this.time+20000;this.nextShot.set(p.id,this.time+300);
     this.emit('pickup',p,p.weapon,p,p,{target:p.id});
   }
   fire(p:Player){
-    if(p.weapon==='grenade'||p.weapon==='bomb')return;const w=p.weapon==='knife'?KNIFE:WEAPONS[p.weapon];if(isGun(p.weapon))p.ammo[p.weapon]=Math.max(0,(p.ammo[p.weapon]??0)-1);this.nextShot.set(p.id,this.time+w.interval);p.protectedUntil=0;
+    if(p.weapon==='grenade'||p.weapon==='bomb')return;const w=p.weapon==='knife'?KNIFE:WEAPONS[p.weapon];if(isGun(p.weapon))p.ammo[p.weapon]=Math.max(0,(p.ammo[p.weapon]??0)-1);this.nextShot.set(p.id,this.time+w.interval);p.protectedUntil=0;p.scope=undefined;
     const from=this.eye(p),dir=direction(p.yaw,p.pitch);let distance=Math.min(p.weapon==='knife'?KNIFE.range:150,wallDistance(from,dir,this.solids)),target:Player|undefined,creature:Trex|undefined,hitZone:HitZone|undefined;
     for(const other of this.players.values()){
       if(other.id===p.id||other.hp<=0)continue;
@@ -122,7 +123,7 @@ export class Simulation {
     const dealt=Math.min(victim.hp,Math.max(0,Math.round(amount)));if(!dealt)return;victim.hp-=dealt;
     this.emit('damage',attacker,weapon,from,this.eye(victim),{target:victim.id,damage:dealt,hp:victim.hp,hitZone,cause});
     if(!victim.hp){
-      this.dropBomb(victim.id);victim.deaths++;victim.respawnAt=this.time+RESPAWN_MS;victim.death={at:this.time,from:{...from},vy:victim.vy,crouched:victim.crouched};victim.reloadUntil=0;
+      this.dropBomb(victim.id);victim.deaths++;victim.respawnAt=this.time+RESPAWN_MS;victim.death={at:this.time,from:{...from},vy:victim.vy,crouched:victim.crouched};victim.reloadUntil=0;victim.scope=undefined;
       const killer=this.players.get(attacker.id);if(victim.team!==attacker.team){if(killer)killer.kills++;if(this.mode==='deathmatch')this.scores[attacker.team]++;}
       this.emit('kill',attacker,weapon,from,victim,{target:victim.id,name:cause==='trex'?'T-REX':killer?.name??'Departed player',victim:victim.name,hitZone,cause});
       if(this.mode==='deathmatch'&&this.scores[attacker.team]>=WIN_SCORE)this.finish();

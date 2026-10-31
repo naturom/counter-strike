@@ -76,15 +76,28 @@ export function anatomicalShoulder(mesh:THREE.Mesh){return (mesh.userData.anatom
 export function poseAnatomicalArm(mesh:THREE.Mesh,shoulder:THREE.Vector3,elbow:THREE.Vector3,wrist:THREE.Vector3,palm:THREE.Matrix4){
  const shape=mesh.userData.anatomicalArm as ArmShape,armInverse=mesh.parent!.matrix.clone().invert();
  const restUpper=shape.elbow.clone().sub(shape.shoulder).normalize(),restLower=shape.wrist.clone().sub(shape.elbow).normalize(),restPole=restUpper.clone().cross(restLower).normalize(),upperPole=restPole.clone().applyQuaternion(new THREE.Quaternion().setFromUnitVectors(restUpper,elbow.clone().sub(shoulder).normalize())),lowerPole=restPole.clone().applyQuaternion(new THREE.Quaternion().setFromUnitVectors(restLower,wrist.clone().sub(elbow).normalize()));
- if(mesh.userData.style!=='ironman'){
-  // Use the actual elbow plane for both bones. A shortest rotation from the
+ {
+  // Use the actual elbow plane for the upper arm. A shortest rotation from the
   // hanging rest arm becomes singular when a raised arm points the other way,
   // spinning the skin even while all three joints move smoothly.
   const plane=elbow.clone().sub(shoulder).cross(wrist.clone().sub(elbow));
   if(plane.lengthSq()>1e-8){plane.normalize();upperPole.copy(plane);lowerPole.copy(plane);}
  }
+ // Pronation follows the hand along the forearm, rather than leaving all of
+ // the roll to the last few cuff vertices (which makes a sharp twisted lip).
+ const handTurn=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().extractRotation(palm.clone().multiply(shape.handInverse)));
+ const handPole=restPole.clone().applyQuaternion(handTurn),distributeTwist=!!mesh.userData.distributeForearmTwist,axis=wrist.clone().sub(elbow).normalize();
+ const hingePole=lowerPole.clone().addScaledVector(axis,-lowerPole.dot(axis)).normalize(),targetPole=handPole.clone().addScaledVector(axis,-handPole.dot(axis)).normalize();let twist=Math.atan2(axis.dot(hingePole.clone().cross(targetPole)),hingePole.dot(targetPole));
+ // Keep the P90's side grasp on one rotation branch instead of reversing
+ // the intermediate twist bones when a rotation crosses PI.
+ if(distributeTwist&&twist<0)twist+=Math.PI*2;
+ lowerPole.copy(distributeTwist?hingePole:handPole);
 
  const upper=boneFrame(shoulder,elbow,upperPole,1/.75,shoulder.distanceTo(elbow)/shape.shoulder.distanceTo(shape.elbow)).multiply(shape.upperInverse),lower=boneFrame(elbow,wrist,lowerPole,1/.75,elbow.distanceTo(wrist)/shape.elbow.distanceTo(shape.wrist)).multiply(shape.lowerInverse),hand=palm.clone().scale(new THREE.Vector3(1.06,1.06,1.06)).setPosition(wrist).multiply(shape.handInverse),fixed=shape.sourceToHeld?armInverse.clone().multiply(shape.sourceToHeld):upper,matrices=[upper,lower,hand,fixed],out=mesh.geometry.attributes.position,normal=mesh.geometry.attributes.normal;
+ // Share a top-magazine grip's pronation along the forearm. All twist bones
+ // rotate about the same straight elbow-to-wrist axis; none roll the hinge.
+ if(distributeTwist)for(let i=1;i<=4;i++)matrices.push(boneFrame(elbow,wrist,hingePole.clone().applyAxisAngle(axis,twist*i/4),1/.75,elbow.distanceTo(wrist)/shape.elbow.distanceTo(shape.wrist)).multiply(shape.lowerInverse));
+ const restForeLength=shape.elbow.distanceTo(shape.wrist),twistBone=(stage:number)=>stage===0?1:3+stage;
  // Dual-quaternion rotation blending preserves the forearm's volume during
  // pronation. Linear matrix blending would pinch a 180-degree wrist turn shut.
  const dual=matrices.map(m=>{
@@ -92,12 +105,18 @@ export function poseAnatomicalArm(mesh:THREE.Mesh,shoulder:THREE.Vector3,elbow:T
   const translation=new THREE.Quaternion(position.x,position.y,position.z,0).multiply(rotation),inverseRotation=new THREE.Matrix3().setFromMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(rotation.clone().conjugate())),stretch=inverseRotation.multiply(new THREE.Matrix3().setFromMatrix4(m));
   return {rotation,translation,stretch:stretch.elements};
  });
+ if(distributeTwist){
+  const align=(bone:number,parent:number)=>{const {rotation:q,translation:d}=dual[bone];if(q.dot(dual[parent].rotation)<0){q.set(-q.x,-q.y,-q.z,-q.w);d.set(-d.x,-d.y,-d.z,-d.w);}};
+  let parent=0;for(const bone of [1,4,5,6,7,2]){align(bone,parent);parent=bone;}align(3,0);
+ }
  for(let i=0;i<out.count;i++){
   const k=i*3,x=shape.position[k],y=shape.position[k+1],z=shape.position[k+2],nx=shape.normal[k],ny=shape.normal[k+1],nz=shape.normal[k+2],pin=shape.sourceToHeld?shape.pin[i]:0,total=shape.weights[i*4]+shape.weights[i*4+1]+shape.weights[i*4+2]+shape.weights[i*4+3];
-   const w0=shape.weights[i*4]/total*(1-pin),w1=shape.weights[i*4+1]/total*(1-pin),w2=shape.weights[i*4+2]/total*(1-pin),w3=shape.weights[i*4+3]/total*(1-pin)+pin;let reference=0,largest=w0;if(w1>largest){reference=1;largest=w1;}if(w2>largest){reference=2;largest=w2;}if(w3>largest)reference=3;
+   const w0=shape.weights[i*4]/total*(1-pin),w1=shape.weights[i*4+1]/total*(1-pin),w2=shape.weights[i*4+2]/total*(1-pin),w3=shape.weights[i*4+3]/total*(1-pin)+pin;
+   const stage=distributeTwist?THREE.MathUtils.clamp(((x-shape.elbow.x)*shape.foreAxis.x+(y-shape.elbow.y)*shape.foreAxis.y+(z-shape.elbow.z)*shape.foreAxis.z)/restForeLength,0,1)*4:0,low=Math.min(3,Math.floor(stage)),blend=stage-low,lowWeight=w1*(1-blend),highWeight=w1*blend;
+   let reference=0,largest=w0;if(distributeTwist){if(lowWeight>largest){reference=twistBone(low);largest=lowWeight;}if(highWeight>largest){reference=twistBone(low+1);largest=highWeight;}}else if(w1>largest){reference=1;largest=w1;}if(w2>largest){reference=2;largest=w2;}if(w3>largest)reference=3;
    let rx=0,ry=0,rz=0,rw=0,dx=0,dy=0,dz=0,dw=0,sx=0,sy=0,sz=0;
-   for(let b=0;b<4;b++){
-    const w=b===0?w0:b===1?w1:b===2?w2:w3;if(w<1e-6)continue;const q=dual[b].rotation,d=dual[b].translation,s=dual[b].stretch,sign=q.dot(dual[reference].rotation)<0?-1:1;
+   for(let b=0;b<(distributeTwist?5:4);b++){
+    const bone=distributeTwist?(b===0?0:b===1?twistBone(low):b===2?twistBone(low+1):b===3?2:3):b,w=distributeTwist?(b===0?w0:b===1?lowWeight:b===2?highWeight:b===3?w2:w3):(b===0?w0:b===1?w1:b===2?w2:w3);if(w<1e-6)continue;const q=dual[bone].rotation,d=dual[bone].translation,s=dual[bone].stretch,sign=!distributeTwist&&q.dot(dual[reference].rotation)<0?-1:1;
     rx+=q.x*w*sign;ry+=q.y*w*sign;rz+=q.z*w*sign;rw+=q.w*w*sign;dx+=d.x*w*sign*.5;dy+=d.y*w*sign*.5;dz+=d.z*w*sign*.5;dw+=d.w*w*sign*.5;
     sx+=(s[0]*x+s[3]*y+s[6]*z)*w;sy+=(s[1]*x+s[4]*y+s[7]*z)*w;sz+=(s[2]*x+s[5]*y+s[8]*z)*w;
    }
