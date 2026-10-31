@@ -58,7 +58,8 @@ export class GameAudio {
   bombAction(at?:Vec3){this.burst(.15,.25,1900,at);this.tone(700,1000,.08,.13,at);}
   bombPlanted(at:Vec3){this.tone(900,1400,.2,.2,at);this.tone(1400,1800,.16,.15,at,.23);}
   bombDefused(){this.tone(1100,500,.5,.3);}
-  grenade(at?:Vec3){this.burst(.08,.3,3200,at);this.tone(1200,700,.08,.08,at);}
+  grenade(at?:Vec3){this.burst(.06,.2,3400,at,.14);this.tone(1600,1100,.035,.055,at,.16);this.burst(.05,.1,4800,at,.28);}
+  grenadeThrow(at?:Vec3){this.burst(.14,.12,850,at,0,'lowpass');this.burst(.035,.08,3100,at);}
   explode(at:Vec3,kind:ExplosionKind='grenade',occluded=false){
     const c=this.context,route=this.route(at);if(!c||!route)return;
     const buffer=this.explosionBuffer(c,kind);

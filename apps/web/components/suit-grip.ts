@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {mergeGeometries,mergeVertices} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {fitHandCuff} from './hand-cuff';
 
-type Grip='knife'|'grenade'|'bomb'|'gun'|'support';
+type Grip='knife'|'grenade'|'bomb'|'gun'|'support'|'pin';
 const vector=(p:number[])=>new THREE.Vector3(p[0],p[1],p[2]);
 /** Smooth glove fingers with a rounded fingertip, rather than separate joint balls. */
 function finger(points:number[][],radius:number){
@@ -36,7 +36,7 @@ function shape(kind:Grip,left:boolean,typing=false,relaxed=false){
   if(relaxed)points=[[x,0,-.012],[x,-.008,-.054+short],[x,-.035,-.054+short],[x,-.047,-.025+short],[x,-.035,-.002+short]];
   else if(kind==='gun'&&i===0&&!left)points=[[x,0,-.012],[x,-.008,-.062],[x,-.028,-.094],[x,-.045,-.075]];
   else if(kind==='gun'||kind==='support')points=[[x,0,-.012],[x,-.008,-.054+short],[x,-.038,-.068+short],[x,-.060,-.044+short],[x,-.055,-.010+short]];
-  else if(kind==='knife')points=[[x,.002,-.012],[x,-.007,-.058+short],[x,-.036,-.075+short],[x,-.064,-.052+short],[x,-.059,-.018+short]];
+  else if(kind==='knife'||kind==='pin')points=[[x,.002,-.012],[x,-.007,-.058+short],[x,-.036,-.075+short],[x,-.064,-.052+short],[x,-.059,-.018+short]];
   else if(kind==='grenade'){
    const radius=Math.sqrt(.071**2-x*x);points=[[x,-.004,-.016]];
    for(const a of [.55,1.05,1.60,2.1-short*5])points.push([x,-.080+Math.cos(a)*radius,-.015-Math.sin(a)*radius]);
@@ -66,5 +66,9 @@ export function createSuitGrip(material:THREE.Material,left:boolean,kind:Grip,re
  const group=new THREE.Group(),geometry=make(),mesh=new THREE.Mesh(geometry,material);group.name=female?'wonder-woman-equipment-grip':'ultraman-equipment-grip';mesh.castShadow=mesh.receiveShadow=true;group.add(mesh);
  if(kind==='bomb'&&!left){const typing=make(true);geometry.morphAttributes.position=[typing.attributes.position.clone()];geometry.morphAttributes.normal=[typing.attributes.normal.clone()];typing.dispose();mesh.updateMorphTargets();group.userData.typingMesh=mesh;}
  group.userData.gripKind=kind;
+ if(kind==='pin'||kind==='grenade'&&!left){
+  const target=shape(kind==='pin'?'pin':'bomb',left);if(female)target.scale(.84,.84,.90);const fitted=fitHandCuff(target,female?.028:.034,female?.021:.027);if(target!==fitted)target.dispose();
+  geometry.morphAttributes.position=[fitted.attributes.position.clone()];geometry.morphAttributes.normal=[fitted.attributes.normal.clone()];fitted.dispose();mesh.updateMorphTargets();group.userData[kind==='pin'?'pinchingMesh':'releaseMesh']=mesh;
+ }
  return group;
 }

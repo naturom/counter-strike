@@ -1,6 +1,6 @@
 import { Room, type Client, ServerError } from '@colyseus/core';
 import { Simulation } from './simulation';
-import {validInput,TEAMS,SurfaceCursor} from '@sirocco/shared';
+import {validInput,SurfaceCursor} from '@sirocco/shared';
 import type { signer } from './invites';
 export const roomsByInvite=new Map<string,string>();
 export const activeRooms=new Map<string,ArenaRoom>();
@@ -15,7 +15,7 @@ export class ArenaRoom extends Room {
   private surfaceClients=new Map<string,SurfaceCursor>();
   private profileExpiry?:{clear():void};
   onCreate(options:{invite:string;awaitProfile?:boolean}) {
-    const invitation=inviteSigner.verify(options.invite);this.inviteId=invitation.id;this.sim=new Simulation(invitation.mapId!,invitation.mode);
+    const invitation=inviteSigner.verify(options.invite);this.inviteId=invitation.id;this.sim=new Simulation(invitation.mapId!,invitation.mode,invitation.teamAvatars);
     // A newly created room has no player until someone submits their profile.
     if(options.awaitProfile){this.autoDispose=false;this.profileExpiry=this.clock.setTimeout(()=>{void this.disconnect();},10*60*1000);}
     this.maxClients=8;
@@ -51,7 +51,7 @@ export class ArenaRoom extends Room {
       if(value.forward||value.strafe||value.fire||value.reload||value.jump||value.crouch||value.interact||value.spray||value.summon||p&&Math.abs(p.yaw-value.yaw)>0.01)this.idle.set(client.sessionId,Date.now());
     });
     // Older clients can still send a saved preference; team identity always wins.
-    this.onMessage('appearance',(client)=>{if(!this.allow(client.sessionId))return;const player=this.sim.players.get(client.sessionId);if(player)player.avatar=TEAMS[player.team].avatar;});
+    this.onMessage('appearance',(client)=>{if(!this.allow(client.sessionId))return;const player=this.sim.players.get(client.sessionId);if(player)player.avatar=this.sim.teamAvatars[player.team];});
     // Cached clients may still show the old vote button; it cannot skip the countdown.
     this.onMessage('rematch',()=>{});
     log('room_created',{room:this.roomId,match:this.sim.matchId});
@@ -73,7 +73,7 @@ export class ArenaRoom extends Room {
     this.allowReconnection(client,20);
   }
   onReconnect(client:Client) {
-    const p=this.sim.players.get(client.sessionId);if(p){p.connected=true;p.avatar=TEAMS[p.team].avatar;}
+    const p=this.sim.players.get(client.sessionId);if(p){p.connected=true;p.avatar=this.sim.teamAvatars[p.team];}
     this.idle.set(client.sessionId,Date.now());log('player_reconnected',{room:this.roomId});
   }
   onLeave(client:Client) {

@@ -12,8 +12,12 @@ export function weaponMuzzlePosition(weaponModel:THREE.Object3D,weapon:keyof typ
  * Copying NDC depth between cameras with different near/far planes moves a
  * one-metre muzzle several metres forward, causing clipped/backwards tracers. */
 export function heldShotOrigin(weaponModel:THREE.Object3D,weapon:keyof typeof MUZZLE_Z,viewCamera:THREE.PerspectiveCamera,worldCamera:THREE.PerspectiveCamera){
+ return heldPointOrigin(weaponMuzzlePosition(weaponModel,weapon),viewCamera,worldCamera);
+}
+/** Also used to hand an actually held grenade into the world at its release. */
+export function heldPointOrigin(point:THREE.Vector3,viewCamera:THREE.PerspectiveCamera,worldCamera:THREE.PerspectiveCamera){
  viewCamera.updateWorldMatrix(true,false);worldCamera.updateWorldMatrix(true,false);
- const muzzle=weaponMuzzlePosition(weaponModel,weapon),view=muzzle.clone().applyMatrix4(viewCamera.matrixWorldInverse),screen=muzzle.project(viewCamera);
+ const view=point.clone().applyMatrix4(viewCamera.matrixWorldInverse),screen=point.clone().project(viewCamera);
  screen.z=new THREE.Vector3(0,0,view.z).applyMatrix4(worldCamera.projectionMatrix).z;
  return screen.unproject(worldCamera);
 }

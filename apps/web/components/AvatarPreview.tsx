@@ -31,7 +31,7 @@ export function AvatarPreview({avatar}:{avatar:AvatarId}){
  },[avatar]);
  return <canvas ref={ref} className="avatar-preview-canvas" aria-label={`${AVATARS.find(a=>a.id===avatar)?.name??'Operator'} 3D appearance preview. Drag to rotate.`}/>;
 }
-export function AvatarPicker({value,onChange,disabled}:{value:AvatarId;onChange:(id:AvatarId)=>void;disabled:boolean}){
+export function AvatarPicker({value,onChange,disabled,label='CHOOSE YOUR APPEARANCE'}:{value:AvatarId;onChange:(id:AvatarId)=>void;disabled:boolean;label?:string}){
  const host=useRef<HTMLFieldSetElement>(null),canvas=useRef<HTMLCanvasElement>(null);
  useEffect(()=>{
   let renderer:THREE.WebGLRenderer;try{renderer=new THREE.WebGLRenderer({canvas:canvas.current!,alpha:true,antialias:true});}catch{return;}
@@ -44,5 +44,5 @@ export function AvatarPicker({value,onChange,disabled}:{value:AvatarId;onChange:
   const draw=()=>{const r=canvas.current!.getBoundingClientRect();if(!r.width||!r.height)return;renderer.setSize(r.width,r.height,false);renderer.setScissor(0,0,r.width,r.height);renderer.setViewport(0,0,r.width,r.height);renderer.clear();renderer.autoClear=false;host.current!.querySelectorAll<HTMLElement>('.avatar-thumb').forEach((el,i)=>{const b=el.getBoundingClientRect(),x=b.left-r.left,y=r.height-(b.bottom-r.top);renderer.setViewport(x,y,b.width,b.height);renderer.setScissor(x,y,b.width,b.height);camera.aspect=b.width/b.height;camera.updateProjectionMatrix();renderer.clearDepth();renderer.render(scenes[i],camera);});renderer.autoClear=true;};
   const observer=new ResizeObserver(draw),unsubscribe=onCharacterTextureReady(draw);observer.observe(host.current!);draw();return()=>{unsubscribe();observer.disconnect();scenes.forEach(disposeGroup);art.destroy();environment.dispose();renderer.dispose();};
  },[]);
- return <fieldset ref={host} className="avatar-picker" disabled={disabled}><legend>CHOOSE YOUR APPEARANCE</legend><canvas ref={canvas} aria-hidden="true"/>{AVATARS.map(a=><button type="button" key={a.id} aria-pressed={value===a.id} aria-label={a.name} onClick={()=>onChange(a.id)} style={{'--avatar-color':a.color} as React.CSSProperties}><span className="avatar-thumb"/><span className="avatar-choice-name">{a.name}</span>{value===a.id&&<span className="avatar-selected" aria-hidden="true">✓</span>}</button>)}</fieldset>;
+ return <fieldset ref={host} className="avatar-picker" disabled={disabled}><legend>{label}</legend><canvas ref={canvas} aria-hidden="true"/>{AVATARS.map(a=><button type="button" key={a.id} aria-pressed={value===a.id} aria-label={a.name} onClick={()=>onChange(a.id)} style={{'--avatar-color':a.color} as React.CSSProperties}><span className="avatar-thumb"/><span className="avatar-choice-name">{a.name}</span>{value===a.id&&<span className="avatar-selected" aria-hidden="true">✓</span>}</button>)}</fieldset>;
 }

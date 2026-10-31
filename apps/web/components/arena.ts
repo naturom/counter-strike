@@ -11,7 +11,7 @@ import {SprayMarks} from './sprays';
 import * as THREE from 'three';
 import {Sky} from 'three/examples/jsm/objects/Sky.js';
 import RAPIER from '@dimforge/rapier3d-compat';
-import {MAPS,DEFAULT_MAP,DT,WEAPONS,gunRecoil,isSidearm,move,wallDistance,plantSite,canReachBomb,neutralInput,eyeOf,nearestPickup,weaponLabel,isGun,type AvatarId,type Team,type MapId,type Equipment,type Motion,type Input,type Snapshot,type Player,type CombatEvent} from '@sirocco/shared';
+import {grenadeThrowProgress,MAPS,DEFAULT_MAP,DT,WEAPONS,gunRecoil,isSidearm,move,wallDistance,plantSite,canReachBomb,neutralInput,eyeOf,nearestPickup,weaponLabel,isGun,type AvatarId,type Team,type MapId,type Equipment,type Motion,type Input,type Snapshot,type Player,type CombatEvent} from '@sirocco/shared';
 import {MAP_TOUR} from './map-tour';
 import {solidGeometry} from './map-geometry';
 import {GameAudio} from './audio';
@@ -20,19 +20,20 @@ import {ExplosionEffects} from './explosions';
 import {WorldArt,disposeGroup} from './world';
 import {animateHands} from './held-equipment';
 import {KNIFE_SWING_MS} from './knife-swing';
-import {heldShotOrigin,weaponMuzzlePosition} from './shot-origin';
+import {heldPointOrigin,heldShotOrigin,weaponMuzzlePosition} from './shot-origin';
 import {MUZZLE_Z} from './weapon-models';
 import {firstPersonHold} from './first-person-hold';
 import {StanceMotion,firstPersonStance} from './stance-motion';
 import {SniperScope,BASE_FOV,scopeFov,type ScopeLevel} from './sniper-scope';
 import {Spectator,spectatorPose} from './spectator';
+import {animateGrenadeFlight,grenadeLeavesHand} from './grenade-flight';
 export interface ArenaCallbacks {input:(i:Input)=>void;lock:(locked:boolean)=>void;board:(show:boolean)=>void;pickup:(label:string)=>void;damage:(angle:number)=>void;scope:(level:ScopeLevel)=>void;spectate?:(id:string|null)=>void;}
 export class Arena {
   scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(76,1,.06,350);renderer:THREE.WebGLRenderer;
   private viewScene=new THREE.Scene();private viewCamera=new THREE.PerspectiveCamera(65,1,.025,8);
   private scope=new SniperScope();private shownScope:ScopeLevel=0;private cycleUntil=0;
   private spectator=new Spectator();private shownSpectator:string|null=null;
-  private throwUntil=0;private equippedAt=0;
+  private equippedAt=0;
   private explosions:ExplosionEffects;private blastShake={start:0,duration:1,strength:0};
   private mirrors:SpawnMirrors;private appearance:AvatarId='ironman';private sprayMarks:SprayMarks;private spray=false;
   private summon=false;private hiddenInput=new HiddenInput();private trexModels:TrexModels;
@@ -86,13 +87,13 @@ export class Arena {
   private syncSpectator(cycle=false){
     const target=this.snap&&(cycle?this.spectator.next(this.snap,this.id):this.spectator.sync(this.snap,this.id)),id=target?.id??null;
     if(id!==this.shownSpectator){
-      this.audio.cancelReload(this.shownSpectator??this.id);this.shownSpectator=id;this.resetScope();this.recoil=0;this.flashUntil=this.throwUntil=this.cycleUntil=this.hurtUntil=0;this.swingStarted=-Infinity;this.flash.visible=false;this.stanceMotion=new StanceMotion();this.keys.clear();this.fire=this.jump=this.reload=this.interact=this.spray=this.summon=false;
+      this.audio.cancelReload(this.shownSpectator??this.id);this.shownSpectator=id;this.resetScope();this.recoil=0;this.flashUntil=this.cycleUntil=this.hurtUntil=0;this.swingStarted=-Infinity;this.flash.visible=false;this.stanceMotion=new StanceMotion();this.keys.clear();this.fire=this.jump=this.reload=this.interact=this.spray=this.summon=false;
       this.callbacks.spectate?.(id);
     }
     return target||undefined;
   }
   private resetLife(weapon:Equipment){
-    this.blur();this.weapon=weapon;this.pending=[];this.accumulator=0;this.recoil=0;this.flashUntil=this.throwUntil=this.cycleUntil=this.hurtUntil=0;this.swingStarted=-Infinity;this.reverseSlash=true;this.flash.visible=false;this.equippedAt=performance.now();this.stanceMotion=new StanceMotion();this.audio.cancelReload(this.id);this.callbacks.board(false);
+    this.blur();this.weapon=weapon;this.pending=[];this.accumulator=0;this.recoil=0;this.flashUntil=this.cycleUntil=this.hurtUntil=0;this.swingStarted=-Infinity;this.reverseSlash=true;this.flash.visible=false;this.equippedAt=performance.now();this.stanceMotion=new StanceMotion();this.audio.cancelReload(this.id);this.callbacks.board(false);
     const hold=firstPersonHold(weapon);this.gun.position.set(...hold.position);this.gun.rotation.set(hold.pitch,hold.yaw,0);this.localSteps.reset();this.localLanding.reset();
   }
   private scopeContext(){const me=this.snap?.players.find(p=>p.id===this.id);return {weapon:this.weapon,alive:!!me?.hp,locked:document.pointerLockElement===this.canvas,reloading:!!me&&me.reloadUntil>this.snap!.time,sprinting:this.keys.has('ShiftLeft')||this.keys.has('ShiftRight'),playing:this.active&&this.snap?.phase==='playing'};}
@@ -143,7 +144,8 @@ export class Arena {
     if(e.type==='bombDefuse'){this.audio.bombDefused();return;}
     if(e.type==='pickup'){if(mine)this.audio.pickup();return;}
     if(e.type==='melee'){this.audio.knife(where,occluded,e.target?'player':e.impact?'wall':'air');if(mine){this.swingStarted=performance.now();this.reverseSlash=!this.reverseSlash;}return;}
-    if(e.type==='grenade'){this.audio.grenade(where);if(mine){this.recoil=.12;this.throwUntil=performance.now()+460;}return;}
+    if(e.type==='grenadePrime'){this.audio.grenade(where);return;}
+    if(e.type==='grenade'){this.audio.grenadeThrow(where);return;}
     if(e.type==='explosion'){
       const kind=e.weapon==='bomb'?'bomb':'grenade',dx=e.from.x-this.camera.position.x,dy=e.from.y-this.camera.position.y,dz=e.from.z-this.camera.position.z,distance=Math.hypot(dx,dy,dz),now=performance.now();
       const occluded=distance>.1&&wallDistance(this.camera.position,{x:dx/distance,y:dy/distance,z:dz/distance},MAPS[this.mapId].solids)<distance-.2;
@@ -173,7 +175,7 @@ export class Arena {
     if(this.destroyed)return;const dt=Math.min((now-this.last)/1000||0,.1);this.last=now;
     if(this.active&&this.snap){
       const me=this.snap.players.find(p=>p.id===this.id),locked=document.pointerLockElement===this.canvas,solids=MAPS[this.mapId].solids;
-      const spectated=this.snap.players.find(p=>p.id===this.spectator.targetId),viewPlayer=spectated??me,viewWeapon=spectated?.weapon??this.weapon,viewMotion=spectated??this.predicted;
+      const spectated=this.snap.players.find(p=>p.id===this.spectator.targetId),viewPlayer=spectated??me,viewWeapon=spectated?.weapon??(me?.grenadeThrow&&!me.grenadeThrow.released?'grenade':this.weapon),viewMotion=spectated??this.predicted;
       const renderTime=now-100;let a=this.snapshots[0],b=this.snapshots.at(-1)!;for(let j=1;j<this.snapshots.length;j++)if(this.snapshots[j].received>=renderTime){a=this.snapshots[j-1];b=this.snapshots[j];break;}const t=a&&b?THREE.MathUtils.clamp((renderTime-a.received)/Math.max(1,b.received-a.received),0,1):1;
       const before=spectated&&(a?.state.players.find(p=>p.id===spectated.id)??spectated),after=spectated&&(b?.state.players.find(p=>p.id===spectated.id)??spectated),viewPose=before&&after?spectatorPose(before,after,t):undefined;
       this.accumulator=Math.min(this.accumulator+dt,DT*3);
@@ -193,18 +195,18 @@ export class Arena {
       if(me&&me.hp>0&&me.hp<=30&&now-this.lastBeat>1150){this.audio.heartbeat();this.lastBeat=now;}
       if(viewPlayer)this.setAppearance(viewPlayer.avatar);this.setGun(viewWeapon);const scopeLevel=spectated?(viewWeapon==='marksman'?spectated.scope??0:0):this.scope.sync(this.scopeContext());if(scopeLevel!==this.shownScope){this.shownScope=scopeLevel;this.callbacks.scope(scopeLevel);}
       const targetFov=scopeFov(scopeLevel);this.camera.fov=this.reduceMotion?targetFov:THREE.MathUtils.lerp(this.camera.fov,targetFov,Math.min(1,dt*22));if(Math.abs(this.camera.fov-targetFov)<.01)this.camera.fov=targetFov;this.camera.updateProjectionMatrix();
-      this.gun.visible=!scopeLevel&&!!viewPlayer?.hp&&this.snap.phase==='playing'&&(!(viewWeapon==='grenade'&&viewPlayer.grenades===0)||now<this.throwUntil);
+      this.gun.visible=!scopeLevel&&!!viewPlayer?.hp&&this.snap.phase==='playing'&&(!(viewWeapon==='grenade'&&viewPlayer.grenades===0)||!!viewPlayer.grenadeThrow);
       this.recoil=Math.max(0,this.recoil-dt*.38);
       const slashProgress=viewWeapon==='knife'?THREE.MathUtils.clamp((now-this.swingStarted)/KNIFE_SWING_MS,0,1):1;
       const reloadProgress=viewPlayer&&isGun(viewWeapon)&&viewPlayer.reloadUntil>this.snap.time?THREE.MathUtils.clamp(1-(viewPlayer.reloadUntil-this.snap.time)/WEAPONS[viewWeapon].reload,0,1):0;
-      const throwProgress=now<this.throwUntil?1-(this.throwUntil-now)/460:0;
+      const simulationRenderTime=this.snap.time+now-(this.snapshots.at(-1)?.received??now),throwProgress=grenadeThrowProgress(viewPlayer?.grenadeThrow,simulationRenderTime);
       const planting=this.snap.bombs.find(b=>b.action?.kind==='plant'&&b.action.playerId===viewPlayer?.id)?.action;
       const plantProgress=planting?THREE.MathUtils.clamp((this.snap.time-planting.startedAt)/(planting.completeAt-planting.startedAt),0,1):0;
-      const draw=this.reduceMotion?0:Math.max(0,1-(now-this.equippedAt)/240),throwArc=viewWeapon==='grenade'?Math.sin(Math.PI*throwProgress):0;
+      const draw=this.reduceMotion?0:Math.max(0,1-(now-this.equippedAt)/240);
       const hold=firstPersonHold(viewWeapon),stance=firstPersonStance(this.stanceMotion.update(dt,viewMotion.grounded,!!viewMotion.crouched,viewMotion.vy),this.reduceMotion);
       this.gun.position.set(hold.position[0],hold.position[1]+stance.y+(!this.reduceMotion&&moving?Math.sin(now*.013)*.007:0)-draw*.14-plantProgress*.06,hold.position[2]+stance.z+this.recoil+draw*.12);
       this.gun.rotation.y=hold.yaw;
-      this.gun.rotation.x=THREE.MathUtils.lerp(this.gun.rotation.x,hold.pitch+stance.pitch+(reloadProgress?-.3*Math.sin(Math.PI*reloadProgress):throwArc*.6),Math.min(1,dt*14));
+      this.gun.rotation.x=THREE.MathUtils.lerp(this.gun.rotation.x,hold.pitch+stance.pitch+(reloadProgress?-.3*Math.sin(Math.PI*reloadProgress):0),Math.min(1,dt*14));
       this.gun.rotation.z=THREE.MathUtils.lerp(this.gun.rotation.z,reloadProgress?-.24*Math.sin(Math.PI*reloadProgress):0,Math.min(1,dt*14));
       const held=this.gunModels.get(viewWeapon);if(held){animateHands(held,viewWeapon,{reload:reloadProgress,throwProgress,plant:plantProgress,slash:slashProgress,reverseSlash:this.reverseSlash,reduceMotion:this.reduceMotion});const body=held.getObjectByName('equipmentBody'),action=body?.getObjectByName(viewWeapon==='marksman'?'bolt':'slide');if(action){const duration=viewWeapon==='marksman'?550:130,p=THREE.MathUtils.clamp(1-(this.cycleUntil-now)/duration,0,1);action.position.z=p>0&&p<1?Math.sin(p*Math.PI)*.055:0;}}
       this.flash.visible=isGun(viewWeapon)&&now<this.flashUntil;
@@ -237,13 +239,23 @@ export class Arena {
        const remoteReload=isGun(p.weapon)&&p.reloadUntil>this.snap.time?THREE.MathUtils.clamp(1-(p.reloadUntil-this.snap.time)/WEAPONS[p.weapon].reload,0,1):0;
        const action=this.snap.bombs.find(bomb=>bomb.action?.kind==='plant'&&bomb.action.playerId===p.id)?.action;
        const remotePlant=action?THREE.MathUtils.clamp((this.snap.time-action.startedAt)/(action.completeAt-action.startedAt),0,1):0;
-       animateAvatarMotion(avatar,viewed?viewWeapon:p.weapon,viewed?{reload:reloadProgress,throwProgress,plant:plantProgress,slash:slashProgress,reverseSlash:this.reverseSlash,reduceMotion:this.reduceMotion}:{reload:remoteReload,plant:remotePlant,throwProgress:0,slash:1},dt,own?this.predicted.grounded:next.grounded,own?this.pitch:next.pitch,own?this.predicted:next);
+       animateAvatarMotion(avatar,viewed?viewWeapon:p.weapon,viewed?{reload:reloadProgress,throwProgress,plant:plantProgress,slash:slashProgress,reverseSlash:this.reverseSlash,reduceMotion:this.reduceMotion}:{reload:remoteReload,plant:remotePlant,throwProgress:grenadeThrowProgress(p.grenadeThrow,serverTime),slash:1},dt,own?this.predicted.grounded:next.grounded,own?this.pitch:next.pitch,own?this.predicted:next);
+       if(p.weapon==='grenade'&&p.grenades===0&&!p.grenadeThrow){const body=avatar.getObjectByName('equipmentBody');if(body)body.visible=false;}
       }
       this.playerNames.update(this.snap.players,this.avatars,spectated?.id??this.id,this.camera,solids,dt,now);
       if(me?.hp===0&&!spectated)this.deadBodies.camera(this.camera,me,this.snap.time+now-(this.snapshots.at(-1)?.received??now),solids);
       this.trexModels.update(this.snap.trexes??[],this.snap.time+now-(this.snapshots.at(-1)?.received??now),dt,this.camera,trex=>{if(this.snap?.phase==='playing')this.audio.creature('trex-step',trex,this.soundOccluded(trex));},solids);
       for(const [id,g] of this.avatars)if(!this.snap.players.some(p=>p.id===id)){this.deadBodies.remove(id);disposeGroup(g);this.avatars.delete(id);this.remoteStep.delete(id);this.remoteLanding.delete(id);}
-      for(const g of this.snap.grenades){let mesh=this.grenadeMeshes.get(g.id);if(!mesh){mesh=this.art.weapon('grenade',false);mesh.scale.setScalar(1.4);this.grenadeMeshes.set(g.id,mesh);this.scene.add(mesh);}mesh.position.lerp(new THREE.Vector3(g.x,g.y,g.z),Math.min(1,dt*25));mesh.rotation.z=now*.004;}
+      for(const g of this.snap.grenades){
+       let mesh=this.grenadeMeshes.get(g.id);let hand:THREE.Vector3|undefined;
+       if(!mesh){
+        mesh=this.art.weapon('grenade',false);const owner=this.snap.players.find(p=>p.id===g.owner);mesh.scale.setScalar(.75*(owner?.avatar==='ultraman'?.78:owner?.avatar==='wonder-woman'?.70:1));
+        for(const name of ['grenade-pin','grenade-lever']){const part=mesh.getObjectByName(name);if(part)part.visible=false;}
+        if(g.owner===viewPlayer?.id&&viewWeapon==='grenade'&&grenadeLeavesHand(g,viewPlayer.grenadeThrow,simulationRenderTime)){const socket=this.gunModels.get('grenade')?.getObjectByName('grenade-release');if(socket)hand=heldPointOrigin(socket.getWorldPosition(new THREE.Vector3()),this.viewCamera,this.camera);}
+        this.grenadeMeshes.set(g.id,mesh);this.scene.add(mesh);
+       }
+       animateGrenadeFlight(mesh,g,dt,now,hand);
+      }
       for(const [id,g] of this.grenadeMeshes)if(!this.snap.grenades.some(p=>p.id===id)){disposeGroup(g);this.grenadeMeshes.delete(id);}
     }else if(this.tourIndex!==null){const view=MAP_TOUR[this.tourIndex];this.camera.position.set(view.eye.x,view.eye.y,view.eye.z);this.camera.lookAt(view.target.x,view.target.y,view.target.z);}else{const a=now*.000012;if(this.mapId==='dunes'){this.camera.position.set(68+Math.sin(a)*4,65,78+Math.cos(a)*3);this.camera.lookAt(0,0,-5);}else{this.camera.position.set(38+Math.sin(a)*4,31,38+Math.cos(a)*3);this.camera.lookAt(-1,0,0);}}
     for(const p of this.pickups.values()){p.rotation.y=now*.0006;p.position.y=(p.userData.floor??0)+.85+Math.sin(now*.002)*.07;}

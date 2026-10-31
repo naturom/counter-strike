@@ -188,8 +188,9 @@ function knife(g:THREE.Group,p:Finish,view:boolean){
 function grenade(art:WorldArt,g:THREE.Group,p:Finish){
   const shell=new THREE.Mesh(new THREE.SphereGeometry(.077,32,24),p.olive);shell.scale.y=1.18;shell.position.y=.015;g.add(shell);
   for(const y of [-.025,.023,.064]){const r=Math.sqrt(Math.max(.001,.077**2-((y-.015)/1.18)**2));ring(g,r,.0022,[0,y,0],p.black,'y');}
-  cylinder(g,.026,.032,[0,.113,0],p.steel,'y');part(g,[.023,.011,.105],[.013,.135,.025],p.steel);const lever=part(g,[.018,.14,.023],[.072,.07,.027],p.steel);lever.rotation.z=.13;
-  ring(g,.032,.004,[-.043,.138,.012],p.edge);cylinder(g,.005,.065,[-.014,.133,.013],p.edge,'x');ring(g,.064,.005,[0,.064,0],p.brass,'y');
+  cylinder(g,.026,.032,[0,.113,0],p.steel,'y');
+  const spoon=new THREE.Group();spoon.name='grenade-lever';g.add(spoon);part(spoon,[.023,.011,.105],[.013,.135,.025],p.steel);const lever=part(spoon,[.018,.14,.023],[.072,.07,.027],p.steel);lever.rotation.z=.13;
+  const pin=new THREE.Group();pin.name='grenade-pin';pin.position.set(-.043,.138,.012);pin.userData.restPosition=pin.position.clone();g.add(pin);ring(pin,.032,.004,[0,0,0],p.edge);cylinder(pin,.005,.065,[.029,-.005,.001],p.edge,'x');ring(g,.064,.005,[0,.064,0],p.brass,'y');
   label(art,g,'FRAG',[0,.035,.075],.07,.019,0,'#d0bb70');label(art,g,'HE  /  M67',[0,.012,.078],.075,.015,0,'#d0bb70');
 }
 function bomb(art:WorldArt,g:THREE.Group,p:Finish){
