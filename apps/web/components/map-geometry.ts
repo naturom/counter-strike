@@ -33,10 +33,10 @@ function wallVolumes(b:Solid):Plane[][]{
   });
 }
 
-/** Render the union of floor volumes, retaining the underside of raised bridges.
+/** Render the union of shared box/ramp volumes, retaining the underside of raised bridges.
  * Clipping covered faces prevents both coplanar depth fighting and buried ramp
  * faces. Collision still uses the original, identical shared floor volumes. */
-export function visibleFloorGeometry(b:Solid,floors:Solid[],walls:Solid[]=[]):THREE.BufferGeometry {
+export function visibleSolidGeometry(b:Solid,floors:Solid[],walls:Solid[]=[]):THREE.BufferGeometry {
   const source=solidGeometry(b),raw=source.index?source.toNonIndexed():source;
   const positions=raw.attributes.position,normals=raw.attributes.normal;
   const output:number[]=[],normalOutput:number[]=[],uv:number[]=[];
@@ -76,6 +76,9 @@ export function visibleFloorGeometry(b:Solid,floors:Solid[],walls:Solid[]=[]):TH
   if(raw!==source)raw.dispose();source.dispose();
   const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(output,3));geometry.setAttribute('normal',new THREE.Float32BufferAttribute(normalOutput,3));geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));return geometry;
 }
+
+// Existing elevated floor/ramp callers retain the same ownership and clipping rules.
+export const visibleFloorGeometry=visibleSolidGeometry;
 
 /** One mesh definition drives visible surfaces and the local debris colliders. */
 export function solidGeometry(b:Solid):THREE.BufferGeometry {

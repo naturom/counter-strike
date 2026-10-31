@@ -2,6 +2,8 @@ import type {AvatarId} from './avatars';
 import {validAvatar} from './avatars';
 export {AVATARS,validAvatar,type AvatarId} from './avatars';
 import {DUST2} from './dust2';
+import {DEPOT} from './depot';
+export {DEPOT,DEPOT_CATWALK} from './depot';
 export {DUST2,dustPoint,DUST_SCALE} from './dust2';
 export {SCOUT_TOWER,scoutTowerRoute} from './scout-tower';
 export {FALL_DAMAGE,fallDamage} from './fall-damage';
@@ -54,42 +56,11 @@ export const freshAmmo=():Ammo=>({rifle:30,pistol:12,smg:0,marksman:0});
 export const gunRecoil=(weapon:Weapon)=>({rifle:.035,pistol:.028,smg:.025,marksman:.065,ak47:.055,m4a1s:.025,p90:.018,scar:.060,m249:.047,deagle:.080})[weapon];
 export const weaponLabel = (weapon: Equipment) => weapon === 'bomb' ? 'C4' : weapon === 'knife' ? 'KNIFE' : weapon === 'grenade' ? 'FRAG' : WEAPONS[weapon].label;
 export type Solid = { x: number; y: number; z: number; w: number; h: number; d: number; kind: 'wall' | 'crate' | 'roof' | 'floor'; polygon?: [number,number][]; ramp?: {axis:'x'|'z';from:number;to:number}; style?: 'plaster'|'kasbah'|'stone'|'road'|'tile'|'door'|'metal'; label?:string;vehicle?:{part:'body'|'cabin'|'cargo';height:number;truck:boolean} };
-const block = (x: number, z: number, w: number, d: number, h = 5, kind: Solid['kind'] = 'wall', y = h / 2): Solid => ({ x, y, z, w, h, d, kind });
-// Original "Relay" arena: offset courtyards around a central open route,
-// a covered west passage and an eastern switchback. Metres, Y up.
-const RELAY_SOLIDS: Solid[] = [
-  block(-30,0,1,49,7), block(30,0,1,49,7), block(0,-24,60,1,7), block(0,24,60,1,7),
-  block(-17,-14,14,9,6), block(-17,9,14,9,5),
-  block(16,-8,13,9,5.5), block(16,15,13,8,6),
-  block(-7,-1,4,10,4), block(5,5,4,9,4.6),
-  block(-25,-2,8,15,0.8,'roof',3.8), // walkable covered passage
-  block(25,3,1,11,3), block(18,5,7,1,2.8),
-  block(-2,-15,3,3,2,'crate'), block(7,-18,2.4,2.4,1.7,'crate'),
-  block(0,14,3,3,2,'crate'), block(-13,19,2.2,2.2,1.7,'crate'),
-  block(12,0,2.4,3,2,'crate'), block(-17,-2,2.2,2.2,2,'crate'),
-];
-const COMMON_SPAWNS: Record<Team, Vec3[]> = {
-  red: [{x:-25,y:0,z:19},{x:-20,y:0,z:19},{x:-26,y:0,z:14},{x:-21,y:0,z:22}],
-  blue: [{x:25,y:0,z:-19},{x:20,y:0,z:-19},{x:26,y:0,z:-14},{x:21,y:0,z:-22}],
-};
 export interface Pickup extends Vec3 { id:string; weapon:Weapon; availableAt:number; }
-export interface MapDefinition {id:MapId;name:string;subtitle:string;description:string;solids:Solid[];spawns:Record<Team,Vec3[]>;pickups:Pickup[];bounds?:{minX:number;maxX:number;minZ:number;maxZ:number};landmarks?:{name:string;x:number;z:number}[];bombSites?:BombSite[];}
-const supplies:Pickup[]=[
-  {id:'west-smg',x:-25,y:0,z:16,weapon:'smg',availableAt:0},
-  {id:'east-smg',x:25,y:0,z:-16,weapon:'smg',availableAt:0},
-  {id:'mid-dmr',x:0,y:0,z:-10,weapon:'marksman',availableAt:0},
-  {id:'court-dmr',x:0,y:0,z:12,weapon:'marksman',availableAt:0},
-  {id:'west-ak47',x:-21,y:0,z:17,weapon:'ak47',availableAt:0},
-  {id:'east-m4a1s',x:21,y:0,z:-17,weapon:'m4a1s',availableAt:0},
-  {id:'west-p90',x:-26,y:0,z:12,weapon:'p90',availableAt:0},
-  {id:'east-scar',x:26,y:0,z:-12,weapon:'scar',availableAt:0},
-  {id:'mid-m249',x:0,y:0,z:2,weapon:'m249',availableAt:0},
-  {id:'west-deagle',x:-20,y:0,z:21,weapon:'deagle',availableAt:0},
-  {id:'east-deagle',x:20,y:0,z:-21,weapon:'deagle',availableAt:0},
-];
+export interface MapDefinition {id:MapId;name:string;subtitle:string;description:string;solids:Solid[];spawns:Record<Team,Vec3[]>;spawnYaw?:Record<Team,number>;pickups:Pickup[];bounds?:{minX:number;maxX:number;minZ:number;maxZ:number};landmarks?:{name:string;x:number;z:number}[];bombSites?:BombSite[];}
 export const MAPS:Record<MapId,MapDefinition>={
   dunes:DUST2,
-  relay:{id:'relay',name:'Relay',subtitle:'The original outpost',description:'Offset alleys and tight cover around a contested central route.',solids:RELAY_SOLIDS,spawns:COMMON_SPAWNS,pickups:supplies},
+  relay:DEPOT,
 };
 export const DEFAULT_MAP:MapId='dunes';
 export const validMap = (value:unknown):value is MapId => value==='dunes'||value==='relay';

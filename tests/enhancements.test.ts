@@ -3,18 +3,18 @@ import assert from 'node:assert/strict';
 import {createHmac} from 'node:crypto';
 import {Simulation} from '../apps/server/src/simulation';
 import {signer} from '../apps/server/src/invites';
-import {MAPS,DEFAULT_MAP,WEAPONS,move,neutralInput,intersects,nearestPickup,type Input,type Motion} from '@sirocco/shared';
+import {MAPS,DEFAULT_MAP,WEAPONS,move,neutralInput,intersects,nearestPickup,groundAt,type Input,type Motion} from '@sirocco/shared';
 function tick(s:Simulation,id:string,n:number,patch:Partial<Input>={}){for(let j=0;j<n;j++){s.input(id,{...neutralInput(),seq:(s.players.get(id)?.ack??0)+1,...patch});s.step();}}
-test('map spawns and supplies are clear; legacy Relay routes stay navigable',()=>{
+test('map spawns and supplies are clear; Depot routes stay navigable',()=>{
   assert.equal(DEFAULT_MAP,'dunes');
   for(const map of Object.values(MAPS)){
     for(const p of [...map.spawns.red,...map.spawns.blue,...map.pickups])assert.equal(map.solids.some(b=>intersects(p,b)),false,`${map.id}: ${JSON.stringify(p)}`);
     if(map.id!=='relay')continue; // Dust II's elevated routes are exercised by dust2.test.ts.
-    const queue=[[-25,19]],seen=new Set(['-25,19']);for(let n=0;n<queue.length;n++){const [x,z]=queue[n];for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){const xx=x+dx,zz=z+dz,k=`${xx},${zz}`;if(Math.abs(xx)>28||Math.abs(zz)>22||seen.has(k)||map.solids.some(b=>intersects({x:xx,y:0,z:zz},b)))continue;seen.add(k);queue.push([xx,zz]);}}
-    assert.ok(seen.has('25,-19'),map.id+' spawn route');for(const p of map.pickups)assert.ok(seen.has(`${p.x},${p.z}`),map.id+' supply route');
+    const start=map.spawns.red[0],queue=[[start.x,start.z]],seen=new Set([`${start.x},${start.z}`]);for(let n=0;n<queue.length;n++){const [x,z]=queue[n];for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){const xx=x+dx,zz=z+dz,k=`${xx},${zz}`;if(Math.abs(xx)>28||Math.abs(zz)>22||seen.has(k)||map.solids.some(b=>intersects({x:xx,y:groundAt({x:xx,z:zz},map.solids,.36),z:zz},b)))continue;seen.add(k);queue.push([xx,zz]);}}
+    assert.ok(seen.has(`${map.spawns.blue[0].x},${map.spawns.blue[0].z}`),map.id+' spawn route');for(const p of map.pickups)assert.ok(seen.has(`${p.x},${p.z}`),map.id+' supply route');
   }
 });
-test('map choice is signed; legacy invitation recreates Relay and map tampering fails',()=>{
+test('map choice is signed; legacy invitation recreates Depot and map tampering fails',()=>{
   const secret='map-test-secret-with-more-than-32-bytes',s=signer(secret),token=s.create(100,'relay');assert.equal(s.verify(token,101).mapId,'relay');
   const [body,sig]=token.split('.');const p=JSON.parse(Buffer.from(body,'base64url').toString());p.mapId='dunes';assert.throws(()=>s.verify(Buffer.from(JSON.stringify(p)).toString('base64url')+'.'+sig,101));
   delete p.mapId;const legacy=Buffer.from(JSON.stringify(p)).toString('base64url');assert.equal(s.verify(legacy+'.'+createHmac('sha256',secret).update(legacy).digest('base64url'),101).mapId,'relay');

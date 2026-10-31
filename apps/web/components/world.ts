@@ -2,16 +2,16 @@ import * as THREE from 'three';
 import {mergeGeometries} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {equipmentModel} from './weapon-models';
 import {buildDust} from './dust-world';
-import {facadeCable} from './environment-details';
+import {buildDepot} from './depot-world';
 import {naturalSand} from './sand-material';
 import {indexStaticMesh} from './static-mesh-index';
-import {MAPS,type MapId,type Equipment,type AvatarId} from '@sirocco/shared';
+import {type MapId,type Equipment,type AvatarId} from '@sirocco/shared';
 export function disposeGroup(group:THREE.Object3D){group.traverse(o=>{if(o instanceof THREE.Mesh||o instanceof THREE.Line)o.geometry.dispose();});group.removeFromParent();}
 export class WorldArt {
   materials:THREE.Material[]=[];textures:THREE.Texture[]=[];
   stone:THREE.MeshStandardMaterial;sand:THREE.MeshStandardMaterial;trim:THREE.MeshStandardMaterial;wood:THREE.MeshStandardMaterial;metal:THREE.MeshStandardMaterial;dark:THREE.MeshStandardMaterial;plaster:THREE.MeshStandardMaterial;paving:THREE.MeshStandardMaterial;timber:THREE.MeshStandardMaterial;asphalt:THREE.MeshStandardMaterial;
-  constructor(renderer:THREE.WebGLRenderer){
-    const load=(name:string,color=false)=>{const t=new THREE.TextureLoader().load(`/textures/${name}.jpg`);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());if(color)t.colorSpace=THREE.SRGBColorSpace;this.textures.push(t);return t;};
+  constructor(renderer:THREE.WebGLRenderer,{terrain=true}:{terrain?:boolean}={}){
+    const load=(name:string,color=false)=>{if(!terrain)return null;const t=new THREE.TextureLoader().load(`/textures/${name}.jpg`);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());if(color)t.colorSpace=THREE.SRGBColorSpace;this.textures.push(t);return t;};
     this.stone=this.material('#ddc6a3',{map:load('stone-color',true),normalMap:load('stone-normal'),roughnessMap:load('stone-rough'),normalScale:new THREE.Vector2(.6,.6)});
     this.sand=naturalSand(this.material('#c6b591',{map:load('sand-color',true),normalMap:load('sand-normal'),roughness:.96,normalScale:new THREE.Vector2(.24,.24)}));
     this.plaster=this.material('#f4eee0',{map:load('plaster-color',true),normalMap:load('plaster-normal'),roughnessMap:load('plaster-rough'),normalScale:new THREE.Vector2(.5,.5)});
@@ -30,44 +30,9 @@ export class WorldArt {
   sign(parent:THREE.Object3D,text:string,x:number,y:number,z:number,rotation=0,color='#3a615d',width=3.6){const c=document.createElement('canvas');c.width=512;c.height=128;const ctx=c.getContext('2d')!;ctx.fillStyle=color;ctx.fillRect(0,0,512,128);ctx.strokeStyle='#e5d7b7';ctx.lineWidth=3;ctx.strokeRect(9,9,494,110);ctx.fillStyle='#e9e2cb';ctx.font=text.length<=4?'bold 86px sans-serif':'bold 38px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,256,66);const texture=new THREE.CanvasTexture(c);texture.colorSpace=THREE.SRGBColorSpace;this.textures.push(texture);const m=this.material('#ffffff',{map:texture,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});const mesh=new THREE.Mesh(new THREE.PlaneGeometry(width,.9),m);mesh.position.set(x,y,z);mesh.rotation.y=rotation;parent.add(mesh);}
   build(mapId:MapId){
     if(mapId==='dunes')return this.batch(buildDust(this));
-    const root=new THREE.Group(),map=MAPS[mapId];this.box(root,180,.2,180,this.sand,0,-.1,0,true);
-    for(const b of map.solids){
-      this.box(root,b.w,b.h,b.d,b.kind==='crate'?this.wood:this.stone,b.x,b.y,b.z,true);
-      if(b.kind==='crate'){
-        for(const y of [-b.h/2+.15,b.h/2-.15])this.box(root,b.w+.035,.12,b.d+.035,this.metal,b.x,b.y+y,b.z);
-        for(const x of [-b.w/2+.16,b.w/2-.16])this.box(root,.1,b.h,b.d+.04,this.metal,b.x+x,b.y,b.z);
-      }else if(b.kind==='wall'){
-        this.box(root,b.w+.12,.18,b.d+.12,this.trim,b.x,b.y+b.h/2-.14,b.z);this.box(root,b.w+.02,.3,b.d+.02,this.dark,b.x,.15,b.z);
-        if(b.w>7&&b.d>6){
-          for(const side of [-1,1])for(let x=-b.w/2+1.3;x<b.w/2-1;x+=2.7){
-            const z=b.z+side*(b.d/2+.03);this.box(root,.85,1.25,.1,this.dark,b.x+x,2.65,z);this.box(root,1.1,.12,.38,this.trim,b.x+x,2,z);
-            for(let k=0;k<7;k++)this.box(root,.78,.055,.13,this.wood,b.x+x,2.18+k*.15,z+side*.04);
-            this.box(root,.08,1.35,.2,this.trim,b.x+x-.48,2.65,z);this.box(root,.08,1.35,.2,this.trim,b.x+x+.48,2.65,z);
-          }
-          // Exposed brick courses, roof cistern and antenna, all above reachable cover.
-          const roof=b.y+b.h/2;this.box(root,b.w*.65,.35,b.d*.55,this.stone,b.x,roof+.17,b.z,true);
-          this.cylinder(root,.75,.75,1.15,this.dark,b.x+1,roof+.7,b.z-1);
-          this.cylinder(root,.025,.025,2.8,this.metal,b.x-1,roof+1.4,b.z);this.box(root,1.5,.025,.025,this.metal,b.x-1,roof+2.3,b.z);
-          for(let k=0;k<5;k++)this.box(root,.6,.16,.03,this.wood,b.x-b.w/2+.5+k*.6,.65+(k%2)*.16,b.z+b.d/2+.04);
-        }
-      }
-    }
-    for(const p of map.pickups){this.box(root,1.2,.18,.7,this.dark,p.x,.09,p.z);this.box(root,1.24,.03,.74,this.metal,p.x,.2,p.z);}
-    // Brick arch ribs: the actual horizontal tunnel roof is in shared collision geometry.
-    const archMat=this.trim;for(const z of [-8,-2,4]){const arch=new THREE.Mesh(new THREE.TorusGeometry(3.15,.16,8,24,Math.PI),archMat);arch.position.set(-25,1,z);root.add(arch);}
-    this.sign(root,map.name.toUpperCase(),0,3,-23.43);
-    this.sign(root,'WEST / TUNNELS',-29.43,2,-2,Math.PI/2,'#876c48');
-    this.sign(root,'01  /  RED',-24,1.4,23.43,Math.PI,'#995b45');this.sign(root,'02  /  BLUE',23,1.4,-23.43,0,'#3c6875');
-    const brick=this.material('#9d7c59');
-    for(let i=0;i<14;i++){const x=-60+i*9,z=-39-(i%3)*7,h=7+i%5*2;this.box(root,7,h,7,this.stone,x,h/2,z,true);this.box(root,7.2,.25,7.2,this.trim,x,h,z);for(let j=0;j<3;j++)this.box(root,.6,1,.05,this.dark,x-2+j*2,h-2,z+3.53);}
-    // Distant minaret and detailed palm silhouettes, no copied game assets.
-    this.cylinder(root,1.6,2,19,this.stone,-38,9.5,-26);this.cylinder(root,2.2,2.2,.5,this.trim,-38,17,-26);const dome=new THREE.Mesh(new THREE.SphereGeometry(1.7,20,12,0,Math.PI*2,0,Math.PI/2),brick);dome.position.set(-38,19,-26);root.add(dome);
-    for(const [x,z] of [[-28,9],[28,-8],[-8,21],[9,-21]])this.palm(root,x,z);
-    for(const z of [-9,10])facadeCable(this,root,[map.solids[0]],[map.solids[1]],{x:-29.4,z},{x:29.4,z},this.metal);
-    // Drain grates and worn ground markings provide visual scale at eye level.
-    for(const [x,z] of [[0,6],[26,0],[-26,10]]){for(let i=0;i<8;i++)this.box(root,.6,.015,.025,this.metal,x,.012,z+i*.08);}
-    return this.batch(root);
+    return this.batch(buildDepot(this));
   }
+
   private batch(root:THREE.Group){
     // Bake static scenery by material to keep detailed maps cheap to draw.
     root.updateMatrixWorld(true);const batches=new Map<string,{material:THREE.Material;cast:boolean;receive:boolean;geometries:THREE.BufferGeometry[]}>();const originals:THREE.Mesh[]=[];
@@ -76,7 +41,6 @@ export class WorldArt {
     for(const {material,cast,receive,geometries} of batches.values()){const merged=mergeGeometries(geometries);for(const geometry of geometries)geometry.dispose();if(merged){const mesh=new THREE.Mesh(merged,material);mesh.castShadow=cast;mesh.receiveShadow=receive;root.add(mesh);}}
     root.traverse(o=>{if(o instanceof THREE.Mesh)indexStaticMesh(o);});return root;
   }
-  private palm(root:THREE.Group,x:number,z:number){const trunk=this.wood,leaf=this.material('#64704b',{side:THREE.DoubleSide});this.cylinder(root,.15,.28,6.7,trunk,x,3.35,z);for(let i=0;i<9;i++){const g=new THREE.Group();g.position.set(x,6.5,z);g.rotation.y=i*Math.PI*2/9;for(let j=0;j<8;j++){const mesh=new THREE.Mesh(new THREE.PlaneGeometry(.7-j*.06,.75),leaf);mesh.position.set(0,-j*j*.022,-j*.38);mesh.rotation.x=-Math.PI/2-j*.07;mesh.rotation.z=(j%2?.12:-.12);g.add(mesh);}root.add(g);}}
   weapon(kind:Equipment,viewmodel=true,heldByAvatar=false,avatar:AvatarId='operator'){return equipmentModel(this,kind,viewmodel,heldByAvatar,avatar);}
   destroy(){for(const m of this.materials)m.dispose();for(const t of this.textures)t.dispose();}
 }

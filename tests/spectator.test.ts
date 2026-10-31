@@ -45,7 +45,11 @@ test('a dead network client sees living aim and scope updates but cannot control
    const response=await fetch(base+'/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nickname:`Spectator ${i}`,mapId:'dunes',mode:'defusal',invite:invite||undefined})}),data=await response.json();assert.equal(response.status,200);invite=data.invite;
    const room=await new Client(base.replace('http:','ws:')).consumeSeatReservation(data.reservation);room.reconnection.enabled=false;room.onMessage('combat',()=>{});room.onMessage('snapshot',(snapshot:Snapshot)=>{if(i===0)state=snapshot;});rooms.push(room);
   }
-  const sim=activeRooms.get(rooms[0].roomId)!.sim,viewer=sim.players.get(rooms[0].sessionId)!,target=sim.players.get(rooms[1].sessionId)!;await until(()=>sim.roundLive);
+  const sim=activeRooms.get(rooms[0].roomId)!.sim;
+  // HTTP joins may cross a server tick. Begin a fresh game so all three clients
+  // participate rather than depending on the third join beating round start.
+  sim.finish();sim.rematch();
+  const viewer=sim.players.get(rooms[0].sessionId)!,target=sim.players.get(rooms[1].sessionId)!;await until(()=>sim.roundLive);
   viewer.protectedUntil=0;sim.damage(viewer,100,viewer,'grenade',viewer);await until(()=>state?.players.find(p=>p.id===viewer.id)?.hp===0);
   const spectator=new Spectator();assert.equal(spectator.sync(state!,viewer.id)?.id,target.id);target.weapon=target.primary='marksman';target.ammo.marksman=8;
   rooms[1].send('input',{...neutralInput(),seq:1,weapon:'marksman',yaw:1.2,pitch:.3,crouch:true,scope:2});await until(()=>state?.players.find(p=>p.id===target.id)?.scope===2);

@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import {MAPS,wallDistance,type MapId} from '@sirocco/shared';
 import {spawnMirrorMounts} from '../apps/web/components/spawn-mirrors';
 import {FIRST_PERSON_SHOT_LAYER} from '../apps/web/components/shot-origin';
-test('both teams have large wall-supported mirrors near spawn on each map',()=>{
- for(const mapId of ['dunes','relay'] as MapId[]){
+test('both Dust III teams have large wall-supported mirrors near spawn',()=>{
+ for(const mapId of ['dunes'] as MapId[]){
   const map=MAPS[mapId],mounts=spawnMirrorMounts(mapId);assert.equal(mounts.length,2);
   for(const m of mounts){
    assert.ok(m.width>=4.8&&m.height>=2.3);
@@ -17,6 +17,17 @@ test('both teams have large wall-supported mirrors near spawn on each map',()=>{
    assert.ok(map.spawns[m.team].some(s=>Math.hypot(s.x-m.x,s.z-m.z)<10),`${mapId} ${m.team}: mirror too far from spawn`);
   }
  }
+});
+
+test('Depot has no mirror geometry or reflection targets, including after switching from Dust III',async()=>{
+ const {SpawnMirrors}=await import('../apps/web/components/spawn-mirrors'),{WorldArt}=await import('../apps/web/components/world');
+ const art=Object.create(WorldArt.prototype) as InstanceType<typeof WorldArt>;art.materials=[];art.textures=[];
+ const scene=new THREE.Scene(),mirrors=new SpawnMirrors(art,scene);mirrors.setMap('dunes');
+ const old=scene.getObjectsByProperty('type','Reflector');assert.equal(old.length,2);let disposed=0;
+ for(const mirror of old)(mirror as unknown as {getRenderTarget():THREE.WebGLRenderTarget}).getRenderTarget().addEventListener('dispose',()=>disposed++);
+ const materials=art.materials.length;mirrors.setMap('relay');assert.deepEqual(spawnMirrorMounts('relay'),[]);assert.equal(disposed,2);
+ assert.equal(scene.getObjectByName('spawnMirrors')!.children.length,0);assert.equal(scene.getObjectsByProperty('type','Reflector').length,0);assert.equal(art.materials.length,materials,'Depot allocates no mirror frame material');
+ mirrors.setMap('dunes');assert.equal(scene.getObjectsByProperty('type','Reflector').length,2);mirrors.destroy();art.destroy();
 });
 
 test('mirror quality adapts pixel cost while accepting every display frame',async()=>{

@@ -1,4 +1,4 @@
-import {DEFAULT_TEAM_AVATARS,validTeamAvatars,type TeamAvatars,DEFAULT_MAP,validMap,validMode,type GameMode,type MapId} from '@sirocco/shared';
+import {MAPS,DEFAULT_TEAM_AVATARS,validTeamAvatars,type TeamAvatars,DEFAULT_MAP,validMap,validMode,type GameMode,type MapId} from '@sirocco/shared';
 import {createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
 export type Invite={v:1;id:string;exp:number;mapId?:MapId;mode?:GameMode;teamAvatars?:TeamAvatars};
 export function signer(secret:string) {
@@ -15,7 +15,7 @@ export function signer(secret:string) {
       if(data.v!==1||! /^[a-f0-9]{32}$/.test(data.id)||!Number.isSafeInteger(data.exp)||data.exp<=now)throw new Error('Invitation expired. Create a new room.');
       if(data.mapId!==undefined&&!validMap(data.mapId))throw new Error('Invalid map');
       if(data.mode!==undefined&&!validMode(data.mode))throw new Error('Invalid mode');
-      if(data.mode==='defusal'&&data.mapId!=='dunes')throw new Error('Bomb Defusal requires Dust III');
+      if(data.mode==='defusal'&&!MAPS[data.mapId??'relay'].bombSites?.length)throw new Error('This map has no bomb sites');
       if(data.teamAvatars!==undefined&&!validTeamAvatars(data.teamAvatars))throw new Error('Invalid team characters');
       return {...data,teamAvatars:{...(data.teamAvatars??DEFAULT_TEAM_AVATARS)},mapId:data.mapId??'relay',mode:data.mode??'deathmatch'};
     }

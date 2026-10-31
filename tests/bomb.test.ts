@@ -60,8 +60,8 @@ test('detonation beats a defuse at the same tick, rematch resets C4 and all prog
  s.rematch();assert.equal(s.phase,'playing');assert.equal(s.bomb?.status,'carried');assert.equal(s.bomb?.action,null);assert.equal(s.bomb?.explodeAt,0);assert.equal(s.outcome,'');assert.ok([...s.players.values()].every(p=>p.hp===100));
  const snap=s.snapshot();snap.bomb!.carrierId='forged';assert.notEqual(s.bomb?.carrierId,'forged');
 });
-test('game mode is signed, legacy invites stay deathmatch, and Relay cannot accept defusal',()=>{
- const signs=signer('bomb-mode-test-secret-with-at-least-32-bytes');const token=signs.create(100,'dunes','defusal');assert.equal(signs.verify(token,101).mode,'defusal');assert.equal(signs.verify(signs.create(100,'dunes'),101).mode,'deathmatch');assert.throws(()=>signs.verify(token.replace('defusal','deathmatch')+'x',101));assert.throws(()=>signs.verify(signs.create(100,'relay','defusal'),101));
+test('game mode is signed, legacy invites stay deathmatch, and Depot also accepts defusal',()=>{
+ const signs=signer('bomb-mode-test-secret-with-at-least-32-bytes');const token=signs.create(100,'dunes','defusal');assert.equal(signs.verify(token,101).mode,'defusal');assert.equal(signs.verify(signs.create(100,'dunes'),101).mode,'deathmatch');assert.throws(()=>signs.verify(token.replace('defusal','deathmatch')+'x',101));assert.equal(signs.verify(signs.create(100,'relay','defusal'),101).mode,'defusal');
 });
 
 test('both teams reject the other target and can only equip their own C4',()=>{

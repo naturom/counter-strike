@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import {DUST2,MAPS,groundAt,dustPoint,wallDistance} from '@sirocco/shared';
+import {DUST2,groundAt,dustPoint,wallDistance} from '@sirocco/shared';
 import {doorFrame,buildDoor,wallSignMount,DUST_ROUTE_SIGNS,roadPaintGeometry,facadeCable,DUST_CABLES} from '../apps/web/components/environment-details';
 import {WorldArt} from '../apps/web/components/world';
 test('rendered gate axes and plank silhouettes match each authoritative collision leaf',()=>{
@@ -43,10 +43,9 @@ test('Long lane paint follows the road at both ends of every stripe without rais
  }
 });
 
-test('utility cables on both maps terminate at façade brackets below the roofline',()=>{
+test('Dust III utility cables terminate at façade brackets below the roofline',()=>{
  const art=Object.create(WorldArt.prototype) as WorldArt;art.materials=[];art.trim=new THREE.MeshStandardMaterial();const metal=new THREE.MeshStandardMaterial(),root=new THREE.Group();
  const spans=DUST_CABLES.map(c=>({a:DUST2.solids.filter(b=>b.label===c.a),b:DUST2.solids.filter(b=>b.label===c.b),from:dustPoint(c.from[0],c.from[1]),to:dustPoint(c.to[0],c.to[1])}));
- for(const z of [-9,10])spans.push({a:[MAPS.relay.solids[0]],b:[MAPS.relay.solids[1]],from:{x:-29.4,y:0,z},to:{x:29.4,y:0,z}});
  for(const span of spans){const {cable,mounts,height}=facadeCable(art,root,span.a,span.b,span.from,span.to,metal),p=cable.geometry.attributes.position;
   mounts.forEach((m,i)=>{const index=i?p.count-1:0,origin={x:p.getX(index),y:p.getY(index),z:p.getZ(index)},normal={x:Math.sin(m.rotation),y:0,z:Math.cos(m.rotation)};
    assert.ok(Math.abs(wallDistance(origin,{x:-normal.x,y:0,z:-normal.z},[m.wall])-.17)<1e-4,'cable must terminate at its wall bracket');

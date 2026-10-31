@@ -21,8 +21,8 @@ test('summons appear on navigable ground ahead, have ten times player HP, and ne
  const copy=s.snapshot();copy.trexes[0].hp=1;copy.trexes[0].x=999;assert.equal(first.hp,1000);assert.notEqual(first.x,999);
  const count=s.trexes.length;p.hp=0;summon(s,p);assert.equal(s.trexes.length,count);
 });
-test('street spawning works at the normal Dust III and Relay starting areas',()=>{
- for(const map of ['dunes','relay'] as const){const s=new Simulation(map),p=s.add('a','Summoner'),t=summon(s,p);assert.ok(t,`${map}: default forward summon needs a street position`);assert.ok(t.z<p.z);assert.equal(s.solids.some(b=>intersects({...t,y:t.y+.012},b,TREX_RULES.height,TREX_RULES.radius)),false);}
+test('street spawning works at the normal Dust III and Depot starting areas',()=>{
+ for(const map of ['dunes','relay'] as const){const s=new Simulation(map),p=s.add('a','Summoner'),t=summon(s,p);assert.ok(t,`${map}: default forward summon needs a street position`);assert.ok((t.x-p.x)*-Math.sin(p.yaw)+(t.z-p.z)*-Math.cos(p.yaw)>0);assert.equal(s.solids.some(b=>intersects({...t,y:t.y+.012},b,TREX_RULES.height,TREX_RULES.radius)),false);}
 });
 test('navigation routes around cover, cannot cross walls, and rejects covered spawn points',()=>{
  const wall:Solid={x:0,y:3,z:0,w:8,h:6,d:.4,kind:'wall'},nav=new TrexNavigation([wall],MAPS.relay),from={x:0,y:0,z:8},to={x:0,y:0,z:-8};assert.equal(nav.clear(from,to),false);const path=nav.path(from,to);assert.ok(path.length>4);assert.ok(path.some(p=>Math.abs(p.x)>4.6));for(let i=1;i<path.length;i++)assert.ok(nav.clear(path[i-1],path[i]));

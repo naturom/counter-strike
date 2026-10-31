@@ -9,10 +9,7 @@ export function spawnMirrorMounts(mapId:MapId):MirrorMount[]{
   {team:'red',...dustPoint(390,881.6,4.48),rotation:0,width:5.8,height:2.36,wall:'T spawn mid screen'},
   {team:'blue',...dustPoint(574.6,185,1.35),rotation:Math.PI/2,width:4.8,height:2.5,wall:'Northern kasbah'},
  ];
- return [
-  {team:'red',x:-29.42,y:1.35,z:18,rotation:Math.PI/2,width:5,height:2.5,wall:'west perimeter'},
-  {team:'blue',x:29.42,y:1.35,z:-18,rotation:-Math.PI/2,width:5,height:2.5,wall:'east perimeter'},
- ];
+ return [];
 }
 /** Spend GPU pixels on clarity without adding a separate reflection frame clock. */
 export class MirrorResolution{
@@ -33,8 +30,9 @@ export class SpawnMirrors{
  constructor(private art:WorldArt,private scene:THREE.Scene){}
  setMap(map:MapId){
   this.clear();this.group=new THREE.Group();this.group.name='spawnMirrors';this.scene.add(this.group);
+  const mounts=spawnMirrorMounts(map);if(!mounts.length)return;
   const frame=this.art.material('#333b3d',{metalness:.85,roughness:.28});
-  for(const mount of spawnMirrorMounts(map)){
+  for(const mount of mounts){
    const group=new THREE.Group();group.position.set(mount.x,mount.y,mount.z);group.rotation.y=mount.rotation;this.group.add(group);
    const mirror=new Reflector(new THREE.PlaneGeometry(mount.width,mount.height),{textureWidth:256,textureHeight:128,color:'#d8dddd',clipBias:.003,multisample:2});mirror.name=`${mount.team} spawn mirror`;mirror.userData.mount=mount;group.add(mirror);this.mirrors.push(mirror);
    this.art.box(group,mount.width+.14,.07,.09,frame,0,mount.height/2+.035,-.02);this.art.box(group,mount.width+.14,.07,.09,frame,0,-mount.height/2-.035,-.02);

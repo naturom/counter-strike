@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {Client,type Room} from '@colyseus/sdk';
-import {intersects,MAPS,RESPAWN_MS,neutralInput,type Snapshot,type Player} from '@sirocco/shared';
+import {intersects,groundAt,MAPS,RESPAWN_MS,neutralInput,type Snapshot,type Player} from '@sirocco/shared';
 const base=(process.env.BASE_URL??'http://127.0.0.1:3000').replace(/\/$/,'');
 const mapId=process.env.MAP_ID==='relay'?'relay':'dunes';const SOLIDS=MAPS[mapId].solids;
 const wait=(ms:number)=>new Promise(r=>setTimeout(r,ms));
@@ -12,7 +12,7 @@ function path(start:Player,goal:{x:number;z:number}){
   for(let n=0;n<queue.length;n++){
     const key=queue[n];if(key===end)break;const [x,z]=key.split(',').map(Number);
     for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){
-      const p={x:x+dx,y:0,z:z+dz},k=`${p.x},${p.z}`;if(Math.abs(p.x)>28||Math.abs(p.z)>22||came.has(k))continue;
+      const p={x:x+dx,y:groundAt({x:x+dx,z:z+dz},SOLIDS,.36),z:z+dz},k=`${p.x},${p.z}`;if(Math.abs(p.x)>28||Math.abs(p.z)>22||came.has(k))continue;
       if(SOLIDS.some(b=>intersects(p,{...b,w:b.w+0.24,d:b.d+0.24})))continue;
       came.set(k,key);queue.push(k);
     }
@@ -36,7 +36,7 @@ async function main(){
     assert.equal((await fetch(base+'/health')).status,200);const html=await (await fetch(base)).text();assert.match(html,/SUPER STRIKE/);
     const a=await join('Verify-Red'),b=await join('Verify-Blue');assert.equal(a.room.roomId,b.room.roomId);
     assert.equal(a.state!.mapId,mapId);
-    await drive(a,{x:-25,z:16});a.room.send('input',{...neutralInput(),seq:++a.seq,interact:true});await until(()=>a.state!.players.find(p=>p.id===a.room.sessionId)?.primary==='smg');
+    await drive(a,MAPS[mapId].pickups.find(p=>p.id==='west-smg')!);a.room.send('input',{...neutralInput(),seq:++a.seq,interact:true});await until(()=>a.state!.players.find(p=>p.id===a.room.sessionId)?.primary==='smg');
     a.room.send('input',{...neutralInput(),seq:++a.seq,crouch:true});await until(()=>a.state!.players.find(p=>p.id===a.room.sessionId)?.crouched===true);
     a.room.send('input',{...neutralInput(),seq:++a.seq});await until(()=>a.state!.players.find(p=>p.id===a.room.sessionId)?.crouched===false);
     await Promise.all([drive(a,{x:0,z:-4}),drive(b,{x:0,z:-8})]);

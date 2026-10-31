@@ -2,9 +2,11 @@
 import {useEffect,useRef,useState} from 'react';
 import {Client, type Room} from '@colyseus/sdk';
 import {AVATARS,DEFAULT_TEAM_AVATARS,validTeamAvatars,type TeamAvatars,type AvatarId,type Team,WEAPONS,MAPS,TEAMS,BOMB_RESULT_DELAY_MS,BOMB_TARGET,DEFAULT_MAP,validMap,weaponLabel,isGun,SurfaceCache,type SurfaceUpdate,type SnapshotUpdate,type GameMode,type MapId,type Snapshot,type CombatEvent} from '@sirocco/shared';
-import {AvatarPicker,AvatarPreview} from './AvatarPreview';
-import {Arena} from './arena';
-import {MAP_TOUR} from './map-tour';
+import {AvatarPicker} from './AvatarPicker';
+import {AvatarPortrait} from './AvatarPortrait';
+import {afterPaint} from './startup-work';
+import type {Arena} from './arena';
+import {tourForMap} from './map-tour';
 import {Minimap} from './Minimap';
 import {BombHud} from './BombHud';
 import {NextGameCountdown} from './NextGameCountdown';
@@ -28,12 +30,21 @@ export default function Game(){
   const [createdHere,setCreatedHere]=useState(false);
   function scout(index:number|null){setPreview(index);arena.current?.preview(index);}
   const [ready,setReady]=useState(false),[name,setName]=useState(''),[invite,setInvite]=useState(''),[status,setStatus]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[playing,setPlaying]=useState(false),[locked,setLocked]=useState(false),[board,setBoard]=useState(false),[snap,setSnap]=useState<Snapshot|null>(null),[feed,setFeed]=useState<(CombatEvent&{at:number})[]>([]),[copied,setCopied]=useState(false),[hit,setHit]=useState(false),[sound,setSound]=useState(true),[notice,setNotice]=useState('');
+  const selectedMapRef=useRef<MapId>(DEFAULT_MAP);
+  function selectMap(id:MapId){selectedMapRef.current=id;setSelectedMap(id);arena.current?.setMap(id);}
   const [selectedMap,setSelectedMap]=useState<MapId>(DEFAULT_MAP),[pickup,setPickup]=useState(''),[hurt,setHurt]=useState(false),[damageAngle,setDamageAngle]=useState(0);const hurtTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   useEffect(()=>{
+    let cancelled=false;
     setName(localStorage.getItem('sirocco-name')??'');const token=new URLSearchParams(location.hash.slice(1)).get('invite')??'';setInvite(token);inviteRef.current=token;if(token)setScreen('profile');
     client.current=new Client(`${location.protocol==='https:'?'wss':'ws'}://${location.host}`);
-    try{arena.current=new Arena(canvas.current!,{input:i=>room.current?.send('input',i),lock:setLocked,board:setBoard,pickup:setPickup,scope:setScopeLevel,spectate:id=>{setSpectatingId(id);setHit(false);setHeadshot(false);setHurt(false);},damage:angle=>{setDamageAngle(angle);setHurt(true);if(hurtTimer.current)clearTimeout(hurtTimer.current);hurtTimer.current=setTimeout(()=>setHurt(false),350);}});if(token){try{const payload=JSON.parse(atob(token.split('.')[0].replace(/-/g,'+').replace(/_/g,'/')));if(validTeamAvatars(payload.teamAvatars))setTeamAvatars(payload.teamAvatars);const mapId=validMap(payload.mapId)?payload.mapId:'relay';setSelectedMap(mapId);setSelectedMode(payload.mode==='defusal'?'defusal':'deathmatch');arena.current.setMap(mapId);}catch{}}setReady(true);}catch{setError('WebGL is unavailable. Use a desktop browser with hardware acceleration enabled.');}
-    return()=>{if(hitTimer.current)clearTimeout(hitTimer.current);if(resultTimer.current)clearTimeout(resultTimer.current);if(hurtTimer.current)clearTimeout(hurtTimer.current);intentional.current=true;void room.current?.leave();arena.current?.destroy();};
+    if(token){try{const payload=JSON.parse(atob(token.split('.')[0].replace(/-/g,'+').replace(/_/g,'/')));if(validTeamAvatars(payload.teamAvatars))setTeamAvatars(payload.teamAvatars);const mapId=validMap(payload.mapId)?payload.mapId:'relay';selectedMapRef.current=mapId;setSelectedMap(mapId);setSelectedMode(payload.mode==='defusal'?'defusal':'deathmatch');}catch{}}
+    // Hydrate the usable lobby before fetching/parsing WebGL, character data and map builders.
+    void (async()=>{try{
+      await afterPaint();if(cancelled)return;const {Arena}=await import('./arena');await afterPaint();if(cancelled)return;
+      arena.current=new Arena(canvas.current!,{input:i=>room.current?.send('input',i),lock:setLocked,board:setBoard,pickup:setPickup,scope:setScopeLevel,spectate:id=>{setSpectatingId(id);setHit(false);setHeadshot(false);setHurt(false);},damage:angle=>{setDamageAngle(angle);setHurt(true);if(hurtTimer.current)clearTimeout(hurtTimer.current);hurtTimer.current=setTimeout(()=>setHurt(false),350);}},selectedMapRef.current);
+      setReady(true);
+    }catch{if(!cancelled)setError('WebGL is unavailable. Use a desktop browser with hardware acceleration enabled.');}})();
+    return()=>{cancelled=true;if(hitTimer.current)clearTimeout(hitTimer.current);if(resultTimer.current)clearTimeout(resultTimer.current);if(hurtTimer.current)clearTimeout(hurtTimer.current);intentional.current=true;void room.current?.leave();arena.current?.destroy();};
   },[]);
   function attach(next:Room){
     const surfaces=new SurfaceCache();next.onMessage('surfaceUpdates',(update:SurfaceUpdate)=>surfaces.apply(update));
@@ -95,26 +106,27 @@ export default function Game(){
   const armed=snap?.bombs.filter(b=>b.status==='planted')??[];const fuse=armed.length?Math.min(...armed.map(b=>b.explodeAt)):null;
   const me=snap?.players.find(p=>p.id===room.current?.sessionId);const remaining=snap?Math.max(0,Math.ceil(((fuse??snap.endsAt)-snap.time)/1000)):600;const time=(snap?.mode??selectedMode)==='defusal'&&fuse===null?'∞':`${String(Math.floor(remaining/60)).padStart(2,'0')}:${String(remaining%60).padStart(2,'0')}`;
   const watching=snap?.mode==='defusal'&&snap.phase==='playing'&&me?.hp===0?snap.players.find(p=>p.id===spectatingId&&p.hp>0&&p.connected):undefined,hudPlayer=watching??me;
-  const map=MAPS[snap?.mapId??selectedMap];const defusal=(snap?.mode??selectedMode)==='defusal';
+  const map=MAPS[snap?.mapId??selectedMap],tour=tourForMap(selectedMap);const defusal=(snap?.mode??selectedMode)==='defusal';
   return <main className={playing?'app in-game':screen==='profile'?'app profile-flow':'app room-flow'}>
-    <canvas ref={canvas} className="arena" aria-label={`${map.name} desert arena`} />
-    {!playing?preview!==null?<div className="map-tour"><div className="tour-heading"><span>DUST III / FIELD RECON</span><button onClick={()=>scout(null)}>BACK TO LOBBY</button></div><div className="tour-caption"><span>{String(preview+1).padStart(2,'0')} / {MAP_TOUR.length}</span><h2>{MAP_TOUR[preview].name}</h2><p>{MAP_TOUR[preview].description}</p><nav aria-label="Map viewpoints">{MAP_TOUR.map((view,i)=><button key={view.name} aria-pressed={preview===i} onClick={()=>scout(i)}>{view.name.split(' · ')[0]}</button>)}</nav></div></div>:<>
+    <canvas ref={canvas} className="arena" aria-label={`${map.name} arena`} />
+    {!ready&&!error&&<div className="arena-loading" role="status">Preparing arena…</div>}
+    {!playing?preview!==null?<div className="map-tour"><div className="tour-heading"><span>{map.name.toUpperCase()} / FIELD RECON</span><button onClick={()=>scout(null)}>BACK TO LOBBY</button></div><div className="tour-caption"><span>{String(preview+1).padStart(2,'0')} / {tour.length}</span><h2>{tour[preview].name}</h2><p>{tour[preview].description}</p><nav aria-label="Map viewpoints">{tour.map((view,i)=><button key={view.name} aria-pressed={preview===i} onClick={()=>scout(i)}>{view.name.split(' · ')[0]}</button>)}</nav></div></div>:<>
       <div className="lobby-shade"/>
       <header className="topbar"><a className="brand" href="/" aria-label="Super Strike home"><span className="brand-mark">╱╱</span> SUPER STRIKE<span className="brand-sub">MULTIPLAYER FPS</span></a><div className="top-meta"><span className="dot"/> ASIA / SINGAPORE <span className="build">BUILD 03</span></div></header>
       <section className="lobby">
-        <div className="intro"><div className="eyebrow"><span className="tiny-line"/> {screen==='profile'?'OPERATOR PROFILE / 02':'DESERT OPERATIONS / 01'}</div><h1>{screen==='profile'?<>Make your <em>name count.</em></>:<>Hold your ground.<br/><em>Own the dust.</em></>}</h1><div className="mode-tags"><span>4 VS 4</span><span>{defusal?'BOMB DEFUSAL':'TEAM DEATHMATCH'}</span><span>NO DOWNLOAD</span></div>
+        <div className="intro"><div className="eyebrow"><span className="tiny-line"/> {screen==='profile'?'OPERATOR PROFILE / 02':selectedMap==='relay'?'INDUSTRIAL OPERATIONS / 01':'DESERT OPERATIONS / 01'}</div><h1>{screen==='profile'?<>Make your <em>name count.</em></>:<>Hold your ground.<br/><em>Own the dust.</em></>}</h1><div className="mode-tags"><span>4 VS 4</span><span>{defusal?'BOMB DEFUSAL':'TEAM DEATHMATCH'}</span><span>NO DOWNLOAD</span></div>
           {screen==='room'?<form className="join-card" onSubmit={e=>{e.preventDefault();void createRoom();}}>
             <div className="card-heading"><span>CREATE YOUR ROOM</span></div>
-            <fieldset className="map-select" disabled={busy}><legend>CHOOSE YOUR MAP</legend><div>{Object.values(MAPS).map(m=><button type="button" key={m.id} aria-pressed={selectedMap===m.id} onClick={()=>{setSelectedMap(m.id);if(m.id==='relay')setSelectedMode('deathmatch');arena.current?.setMap(m.id);}}><strong>{m.name}</strong><small>{m.subtitle}</small></button>)}</div></fieldset>
-            {selectedMap==='dunes'&&<fieldset className="mode-select" disabled={busy}><legend>GAME MODE</legend><button type="button" aria-pressed={selectedMode==='defusal'} onClick={()=>setSelectedMode('defusal')}>BOMB DEFUSAL</button><button type="button" aria-pressed={selectedMode==='deathmatch'} onClick={()=>setSelectedMode('deathmatch')}>DEATHMATCH</button></fieldset>}
+            <fieldset className="map-select" disabled={busy}><legend>CHOOSE YOUR MAP</legend><div>{Object.values(MAPS).map(m=><button type="button" key={m.id} aria-pressed={selectedMap===m.id} onClick={()=>{selectMap(m.id);}}><strong>{m.name}</strong><small>{m.subtitle}</small></button>)}</div></fieldset>
+            <fieldset className="mode-select" disabled={busy}><legend>GAME MODE</legend><button type="button" aria-pressed={selectedMode==='defusal'} onClick={()=>setSelectedMode('defusal')}>BOMB DEFUSAL</button><button type="button" aria-pressed={selectedMode==='deathmatch'} onClick={()=>setSelectedMode('deathmatch')}>DEATHMATCH</button></fieldset>
             <div className="team-character-picker">{(['red','blue'] as const).map(team=><AvatarPicker key={team} label={`${TEAMS[team].name.toUpperCase()} CHARACTER`} value={teamAvatars[team]} onChange={avatar=>chooseTeamCharacter(team,avatar)} disabled={busy}/>)}</div>
-            <button className="primary" type="submit" disabled={!ready||busy}>{busy?'CREATING…':'CREATE A ROOM'} <span>↗</span></button>
+            <button className="primary" type="submit" disabled={busy}>{busy?'CREATING…':'CREATE A ROOM'} <span>↗</span></button>
           </form>:<form className="join-card profile-card" onSubmit={e=>{e.preventDefault();void join();}}>
             <div className="card-heading"><span>{createdHere?'ROOM CREATED':'INVITATION RECEIVED'}</span></div>
             <h2>Choose your callsign.</h2><p className="profile-description">Join a balanced team. Your character is assigned automatically.</p>
             <div className="profile-room"><span>{map.name}</span><span>{defusal?'BOMB DEFUSAL':'TEAM DEATHMATCH'}</span></div>
             <label htmlFor="callsign">YOUR CALLSIGN</label><div className="entry"><span className="input-icon">⌁</span><input key="profile-callsign" id="callsign" maxLength={20} placeholder="Enter a guest nickname" value={name} onChange={e=>setName(e.target.value)} autoComplete="nickname" autoFocus required disabled={busy}/></div>
-            <button className="primary" type="submit" disabled={!ready||busy||!name.trim()}>{busy?'CONNECTING…':createdHere?'ENTER THE ROOM':'JOIN THE ROOM'}<span>↗</span></button>
+            <button className="primary" type="submit" disabled={!ready||busy||!name.trim()}>{busy?'CONNECTING…':!ready?'PREPARING ARENA…':createdHere?'ENTER THE ROOM':'JOIN THE ROOM'}<span>↗</span></button>
             <div className="card-foot"><span className="dot"/> Team A · {characterName(teamAvatars.red)} / Team B · {characterName(teamAvatars.blue)}</div>
             <button type="button" className="secondary" onClick={share}>{copied?'COPIED ✓':'COPY INVITATION LINK'}</button>
             {notice&&<p className="profile-description" role="status">{notice}</p>}
@@ -122,7 +134,7 @@ export default function Game(){
           </form>}
           {(error||status)&&<p className={error?'message error':'message'} role="status">{error||status}</p>}
         </div>
-        {screen==='profile'?<aside className="appearance-stage team-appearance-stage" aria-label="Team appearances"><div className="eyebrow">KNOW YOUR TEAM</div><div className="team-appearances">{(['red','blue'] as const).map(team=><figure className={`team-appearance team-${team}`} key={team}><AvatarPreview avatar={teamAvatars[team]}/><figcaption><span>{TEAMS[team].name.toUpperCase()}</span><h2>{characterName(teamAvatars[team])}</h2></figcaption></figure>)}</div><p className="team-assignment-note">Players on your team share the same appearance.</p></aside>:        <aside className="map-label"><span className="map-kicker">{map.subtitle.toUpperCase()}</span><h2>{map.name.toUpperCase()}</h2><p>{map.description}</p><div className="map-stats"><div><b>{defusal?'C4':'30'}</b><span>{defusal?'PLANT / DEFUSE':'KILLS TO WIN'}</span></div><div><b>{defusal?'∞':<>10<span>:00</span></>}</b><span>ROUND TIME</span></div></div>{selectedMap==='dunes'&&<button className="scout-map" onClick={()=>scout(0)}>SCOUT THE MAP</button>}</aside>}
+        {screen==='profile'?<aside className="appearance-stage team-appearance-stage" aria-label="Team appearances"><div className="eyebrow">KNOW YOUR TEAM</div><div className="team-appearances">{(['red','blue'] as const).map(team=><figure className={`team-appearance team-${team}`} key={team}><AvatarPortrait avatar={teamAvatars[team]} interactive={ready}/><figcaption><span>{TEAMS[team].name.toUpperCase()}</span><h2>{characterName(teamAvatars[team])}</h2></figcaption></figure>)}</div><p className="team-assignment-note">Players on your team share the same appearance.</p></aside>:        <aside className="map-label"><span className="map-kicker">{map.subtitle.toUpperCase()}</span><h2>{map.name.toUpperCase()}</h2><p>{map.description}</p><div className="map-stats"><div><b>{defusal?'C4':'30'}</b><span>{defusal?'PLANT / DEFUSE':'KILLS TO WIN'}</span></div><div><b>{defusal?'∞':<>10<span>:00</span></>}</b><span>ROUND TIME</span></div></div><button className="scout-map" onClick={()=>scout(0)}>SCOUT THE MAP</button></aside>}
       </section>
       <footer className="lobby-footer"><span>BUILT FOR THE BROWSER. MADE FOR THE SQUAD.</span><span><a href="/audio/CREDITS.txt" target="_blank" rel="noreferrer">AUDIO CREDITS</a> · DESKTOP + MOUSE</span></footer>
     </>:<>
