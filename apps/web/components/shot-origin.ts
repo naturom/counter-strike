@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import {MUZZLE_Z} from './weapon-models';
 
+// Screen-aligned effects must never be reflected as if they belonged to the world gun.
+export const FIRST_PERSON_SHOT_LAYER=2;
+
 /** Resolve the selected weapon's real barrel, after all hand and action offsets. */
 export function weaponMuzzlePosition(weaponModel:THREE.Object3D,weapon:keyof typeof MUZZLE_Z){
  const muzzle=weaponModel.getObjectByName('muzzle');

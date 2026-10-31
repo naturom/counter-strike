@@ -15,7 +15,7 @@ Click **Enter the arena** to capture your mouse. Escape releases it.
 | Space / Shift | Jump / sprint (cannot fire while sprinting) |
 | R | Reload |
 | 1 | Knife |
-| 2 / 3 | Equipped primary gun / pistol |
+| 2 / 3 | Equipped pistol / primary gun |
 | E | Pick up a nearby gun or dropped C4; hold near enemy C4 to defuse |
 | 4, then left click | Select and throw a frag grenade |
 | 5, then hold left click | Select your team’s C4; Team A plants at A, Team B at B |
@@ -35,7 +35,7 @@ In bomb defusal, dead players spectate a living, connected player in first perso
 
 The knife deals 40 damage within 1.8 metres, with one slash per click and a half-second cooldown. Solid cover, friendly-fire rules and spawn protection apply. It uses no ammunition. Selecting a grenade does not throw it. Left-click starts a one-second action: pull the pin ring with the left hand, wind up, release at 700 ms, then recover with open throwing fingers. The server creates the flying grenade at that release, using the current aim; mirrors and spectators follow the same sequence. An empty grenade slot shows zero remaining.
 
-Weapon racks on both maps offer the original SMG and scoped AWP, plus AK-47, suppressed M4A1-S, P90, SCAR-H, M249 and Desert Eagle. The added guns have distinct models in first person, mirrors and world pickups; damage, firing cadence, magazines, recoil and reload timing vary by gun. The P90 has a top-mounted 50-round magazine, the M249 has a 100-round belt box and animated feed cover, and the Desert Eagle has a seven-round magazine. M4A1-S reports are quieter and carry a smaller muzzle flash. Primary pickups replace slot 2 while retaining your sidearm; the Desert Eagle replaces the sidearm in slot 3 while retaining your primary; each rack replenishes after 20 seconds. Respawning restores rifle, pistol and two grenades. Grenades bounce, explode 2.2 seconds after release, and apply distance-based damage within eight metres, respecting solid cover. They can hurt their thrower but not teammates.
+Weapon racks on both maps offer the original SMG and scoped AWP, plus AK-47, suppressed M4A1-S, P90, SCAR-H, M249 and Desert Eagle. The added guns have distinct models in first person, mirrors and world pickups; damage, firing cadence, magazines, recoil and reload timing vary by gun. The P90 has a top-mounted 50-round magazine, the M249 has a 100-round belt box and animated feed cover, and the Desert Eagle has a seven-round magazine. M4A1-S reports are quieter and carry a smaller muzzle flash. Primary pickups replace slot 3 while retaining your sidearm; the Desert Eagle replaces the sidearm in slot 2 while retaining your primary; each rack replenishes after 20 seconds. Respawning restores rifle, pistol and two grenades. Grenades bounce, explode 2.2 seconds after release, and apply distance-based damage within eight metres, respecting solid cover. They can hurt their thrower but not teammates.
 
 Crouching lowers your camera and hitbox and slows movement; standing is blocked under low cover. Incoming hits produce a directional red indicator, screen vignette, sound and brief camera jolt. Numeric health and a health bar show HP remaining; low health adds a pulse and heartbeat. Reduced-motion preferences suppress camera shake and weapon bob.
 

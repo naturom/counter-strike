@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {Reflector} from 'three/examples/jsm/objects/Reflector.js';
 import {dustPoint,type MapId,type Team} from '@sirocco/shared';
 import {disposeGroup,type WorldArt} from './world';
+import {FIRST_PERSON_SHOT_LAYER} from './shot-origin';
 export type MirrorMount={team:Team;x:number;y:number;z:number;rotation:number;width:number;height:number;wall:string};
 export function spawnMirrorMounts(mapId:MapId):MirrorMount[]{
  if(mapId==='dunes')return [
@@ -47,7 +48,7 @@ export class SpawnMirrors{
     renderer.getDrawingBufferSize(buffer);const size=quality.update(performance.now(),buffer.x,buffer.y),target=mirror.getRenderTarget();
     if(target.width!==size.width||target.height!==size.height)target.setSize(size.width,size.height);
     // The local body lives on layer 1, visible only to the reflected camera.
-    const reflection=(mirror as unknown as {getReflectionCamera(c:THREE.Camera):THREE.Camera}).getReflectionCamera(camera);reflection.layers.enable(1);
+    const reflection=(mirror as unknown as {getReflectionCamera(c:THREE.Camera):THREE.Camera}).getReflectionCamera(camera);reflection.layers.enable(1);reflection.layers.disable(FIRST_PERSON_SHOT_LAYER);
     const visible=this.mirrors.map(m=>m.visible);this.mirrors.forEach(m=>m.visible=false);this.reflecting=true;
     try{render(renderer,scene,camera,geometry,material,object);}finally{this.reflecting=false;this.mirrors.forEach((m,i)=>m.visible=visible[i]);}
    };

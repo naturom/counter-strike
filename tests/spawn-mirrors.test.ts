@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import assert from 'node:assert/strict';
 import {MAPS,wallDistance,type MapId} from '@sirocco/shared';
 import {spawnMirrorMounts} from '../apps/web/components/spawn-mirrors';
+import {FIRST_PERSON_SHOT_LAYER} from '../apps/web/components/shot-origin';
 test('both teams have large wall-supported mirrors near spawn on each map',()=>{
  for(const mapId of ['dunes','relay'] as MapId[]){
   const map=MAPS[mapId],mounts=spawnMirrorMounts(mapId);assert.equal(mounts.length,2);
@@ -36,6 +37,8 @@ test('visible mirrors render on every frame, include the local body, and skip hi
  const scene=new THREE.Scene(),mirrors=new SpawnMirrors(art,scene);mirrors.setMap('dunes');scene.updateMatrixWorld(true);
  const mirror=scene.getObjectByName('red spawn mirror') as THREE.Mesh,mount=spawnMirrorMounts('dunes')[0],camera=new THREE.PerspectiveCamera(76,16/9,.06,350);camera.position.set(mount.x,mount.y,mount.z+3);camera.lookAt(mount.x,mount.y,mount.z);camera.updateMatrixWorld(true);
  let renders=0,target:unknown=null;const renderer={getDrawingBufferSize:(out:THREE.Vector2)=>out.set(1280,720),getRenderTarget:()=>target,setRenderTarget:(next:unknown)=>{target=next;},xr:{enabled:false},shadowMap:{autoUpdate:true},state:{buffers:{depth:{setMask:()=>{}}}},autoClear:true,render:(_scene:THREE.Scene,reflected:THREE.Camera)=>{renders++;assert.ok(reflected.layers.isEnabled(1),'local character must be visible in reflection');}} as unknown as THREE.WebGLRenderer;
+ camera.layers.enable(FIRST_PERSON_SHOT_LAYER);
+ const render=renderer.render.bind(renderer);renderer.render=((s,c)=>{assert.ok(!c.layers.isEnabled(FIRST_PERSON_SHOT_LAYER),'mirrors must exclude the screen-aligned gun tracer, including on a cloned camera');render(s,c);}) as THREE.WebGLRenderer['render'];
  const draw=()=>mirror.onBeforeRender(renderer,scene,camera,mirror.geometry,mirror.material as THREE.Material,null as unknown as THREE.Group);
  for(let i=0;i<120;i++)draw();
  const targetSize=(mirror as unknown as {getRenderTarget():THREE.WebGLRenderTarget}).getRenderTarget();assert.equal(targetSize.samples,2,'reflections smooth jagged character edges');assert.ok(targetSize.width>=832,'even the adaptive floor must retain detail');assert.equal(renders,120,'no time cap may drop display frames');assert.equal(mirror.visible,true);
